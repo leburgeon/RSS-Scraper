@@ -5,8 +5,10 @@ import feedparser
 import requests
 import logging
 from bs4 import BeautifulSoup
+import hashlib
 
 logging.basicConfig(level=logging.INFO)
+
 
 def poll_rss_feed_for_articles(feed_url) -> list:
     """
@@ -14,7 +16,7 @@ def poll_rss_feed_for_articles(feed_url) -> list:
     """
     # feedparser.parse can take a URL, a file path, or a raw XML string
     feed = feedparser.parse(feed_url)
-    
+
     articles = []
 
     for entry in feed.entries:
@@ -23,14 +25,16 @@ def poll_rss_feed_for_articles(feed_url) -> list:
             "link": entry.get('link'),
             "publish_date": entry.get('published'),
             "guid": entry.get('id'),
-            "summary": entry.get('summary')         
+            "summary": entry.get('summary')
         })
 
     return articles
 
+
 def filter_articles_by_date(articles: list[dict], most_recent_date: str) -> list[dict]:
     """Filter out articles that are before a certain date"""
-    most_recent_date = datetime.strptime(most_recent_date, '%a, %d %b %Y %H:%M:%S %Z')
+    most_recent_date = datetime.strptime(
+        most_recent_date, '%a, %d %b %Y %H:%M:%S %Z')
 
     filtered_articles = []
 
@@ -38,11 +42,13 @@ def filter_articles_by_date(articles: list[dict], most_recent_date: str) -> list
         publish_date_str = article.get('publish_date')
         if publish_date_str:
             try:
-                publish_date = datetime.strptime(publish_date_str, '%a, %d %b %Y %H:%M:%S %Z')
+                publish_date = datetime.strptime(
+                    publish_date_str, '%a, %d %b %Y %H:%M:%S %Z')
                 if publish_date > most_recent_date:
                     filtered_articles.append(article)
             except ValueError as e:
-                logging.error(f"Error parsing publish date '{publish_date_str}': {e}")
+                logging.error(
+                    f"Error parsing publish date '{publish_date_str}': {e}")
 
     return filtered_articles
 
@@ -54,7 +60,8 @@ def get_html_content_from_article_link(article_link) -> str:
         response.raise_for_status()  # Check if the request was successful
         return response.text
     except requests.RequestException as e:
-        logging.error(f"Error fetching article content from {article_link}: {e}")
+        logging.error(
+            f"Error fetching article content from {article_link}: {e}")
         return None
 
 
@@ -69,13 +76,24 @@ def extract_article_content(html_content) -> str:
     except Exception as e:
         logging.error(f"Error extracting article content: {e}")
         return None
-    
+
+
+def generate_article_id(feed_id: str, guid: str) -> str:
+    """
+    Generate a unique article ID based on feed ID and article GUID.
+    """
+    unique_id = hashlib.sha256(guid.encode('utf-8')).hexdigest()
+
+    return f"{feed_id}#{unique_id}"
+
+
 if __name__ == "__main__":
     # Simple tests to show that the functions work
-    feed_url = "https://www.theguardian.com/technology/rss"  # Replace with your RSS feed URL
+    # Replace with your RSS feed URL
+    feed_url = "https://www.theguardian.com/technology/rss"
 
     articles = poll_rss_feed_for_articles(feed_url)
-    
+
     html_content = get_html_content_from_article_link(articles[0]['link'])
     article_text = extract_article_content(html_content)
     print(article_text)
