@@ -85,9 +85,21 @@ def compute_mention_volume(df):
 
     company_df = df[df["entity_type"] == "company"].copy()
 
+    if company_df.empty:
+        return pd.DataFrame(
+            columns=["entity_id", "entity_name",
+                     "entity_type", "mention_volume"]
+        )
+
     company_df = company_df[
         ["entity_id", "entity_name", "entity_type", "article_id"]
     ].dropna()
+
+    if company_df.empty:
+        return pd.DataFrame(
+            columns=["entity_id", "entity_name",
+                     "entity_type", "mention_volume"]
+        )
 
     company_df = company_df.drop_duplicates(subset=["entity_id", "article_id"])
 
@@ -106,29 +118,17 @@ def compute_mention_volume(df):
     return mention_volume_df
 
 
-def get_top_3_companies(mention_volume_df):
-    """Return top 3 companies by mention volume."""
-    return mention_volume_df.head(3).copy()
-
-
-def get_bottom_3_companies(mention_volume_df):
-    """Return bottom 3 companies by mention volume, excluding zero."""
-    non_zero_df = mention_volume_df[mention_volume_df["mention_volume"] > 0].copy(
-    )
-    non_zero_df = non_zero_df.sort_values(by="mention_volume", ascending=True)
-    return non_zero_df.head(3).copy()
-
-# Sentiment function
-
-
-logging.basicConfig(level=logging.INFO)
-
-
 def filter_company_sentiment_rows(df):
     """Keep only company rows with the columns needed for sentiment analysis."""
     logging.info("Filtering company sentiment rows")
 
     company_df = df[df["entity_type"] == "company"].copy()
+
+    if company_df.empty:
+        return pd.DataFrame(
+            columns=["entity_id", "entity_name", "entity_type", "sentiment"]
+        )
+
     company_df = company_df[
         ["entity_id", "entity_name", "entity_type", "sentiment"]
     ].dropna()
@@ -139,6 +139,14 @@ def filter_company_sentiment_rows(df):
 def count_sentiment_by_company(company_df):
     """Count positive, neutral, and negative rows for each company."""
     logging.info("Counting sentiment by company")
+
+    if company_df.empty:
+        return pd.DataFrame(
+            columns=[
+                "entity_id", "entity_name", "entity_type",
+                "positive", "neutral", "negative"
+            ]
+        )
 
     sentiment_counts_df = (
         company_df.groupby(
@@ -160,20 +168,38 @@ def add_sentiment_percentages(sentiment_counts_df):
     """Add total, positive_pct, neutral_pct, and negative_pct columns."""
     logging.info("Adding sentiment percentages")
 
+    if sentiment_counts_df.empty:
+        return pd.DataFrame(
+            columns=[
+                "entity_id", "entity_name", "entity_type",
+                "positive", "neutral", "negative",
+                "total", "positive_pct", "neutral_pct", "negative_pct"
+            ]
+        )
+
     sentiment_counts_df["total"] = (
         sentiment_counts_df["positive"]
         + sentiment_counts_df["neutral"]
         + sentiment_counts_df["negative"]
     )
 
-    sentiment_counts_df["positive_pct"] = (
-        sentiment_counts_df["positive"] / sentiment_counts_df["total"]
+    sentiment_counts_df["positive_pct"] = 0.0
+    sentiment_counts_df["neutral_pct"] = 0.0
+    sentiment_counts_df["negative_pct"] = 0.0
+
+    non_zero_mask = sentiment_counts_df["total"] > 0
+
+    sentiment_counts_df.loc[non_zero_mask, "positive_pct"] = (
+        sentiment_counts_df.loc[non_zero_mask, "positive"]
+        / sentiment_counts_df.loc[non_zero_mask, "total"]
     )
-    sentiment_counts_df["neutral_pct"] = (
-        sentiment_counts_df["neutral"] / sentiment_counts_df["total"]
+    sentiment_counts_df.loc[non_zero_mask, "neutral_pct"] = (
+        sentiment_counts_df.loc[non_zero_mask, "neutral"]
+        / sentiment_counts_df.loc[non_zero_mask, "total"]
     )
-    sentiment_counts_df["negative_pct"] = (
-        sentiment_counts_df["negative"] / sentiment_counts_df["total"]
+    sentiment_counts_df.loc[non_zero_mask, "negative_pct"] = (
+        sentiment_counts_df.loc[non_zero_mask, "negative"]
+        / sentiment_counts_df.loc[non_zero_mask, "total"]
     )
 
     return sentiment_counts_df
@@ -192,6 +218,16 @@ def compute_sentiment_distribution(df):
     logging.info("Computing sentiment distribution")
 
     company_df = filter_company_sentiment_rows(df)
+
+    if company_df.empty:
+        return pd.DataFrame(
+            columns=[
+                "entity_id", "entity_name", "entity_type",
+                "positive", "neutral", "negative",
+                "total", "positive_pct", "neutral_pct", "negative_pct"
+            ]
+        )
+
     sentiment_counts_df = count_sentiment_by_company(company_df)
     sentiment_distribution_df = add_sentiment_percentages(sentiment_counts_df)
 
@@ -207,16 +243,17 @@ def compute_sentiment_distribution(df):
     return sentiment_distribution_df
 
 
-logging.basicConfig(level=logging.INFO)
-
-
-# Share of Voice functions
-
 def filter_company_article_rows(df):
     """Keep only company rows and the columns needed for share of voice."""
     logging.info("Filtering company article rows")
 
     company_df = df[df["entity_type"] == "company"].copy()
+
+    if company_df.empty:
+        return pd.DataFrame(
+            columns=["entity_id", "entity_name", "entity_type", "article_id"]
+        )
+
     company_df = company_df[
         ["entity_id", "entity_name", "entity_type", "article_id"]
     ].dropna()
@@ -232,6 +269,12 @@ def count_articles_by_company(company_df):
     should only count once for article count.
     """
     logging.info("Counting distinct articles by company")
+
+    if company_df.empty:
+        return pd.DataFrame(
+            columns=["entity_id", "entity_name",
+                     "entity_type", "article_count"]
+        )
 
     company_df = company_df.drop_duplicates(subset=["entity_id", "article_id"])
 
@@ -255,10 +298,18 @@ def add_share_of_voice(article_counts_df):
     """
     logging.info("Adding share of voice")
 
+    if article_counts_df.empty:
+        return pd.DataFrame(
+            columns=[
+                "entity_id", "entity_name", "entity_type",
+                "article_count", "share_of_voice"
+            ]
+        )
+
     total_article_mentions = article_counts_df["article_count"].sum()
 
     if total_article_mentions == 0:
-        article_counts_df["share_of_voice"] = 0
+        article_counts_df["share_of_voice"] = 0.0
     else:
         article_counts_df["share_of_voice"] = (
             article_counts_df["article_count"] / total_article_mentions
@@ -280,6 +331,15 @@ def compute_share_of_voice(df):
     logging.info("Computing share of voice")
 
     company_df = filter_company_article_rows(df)
+
+    if company_df.empty:
+        return pd.DataFrame(
+            columns=[
+                "entity_id", "entity_name", "entity_type",
+                "article_count", "share_of_voice"
+            ]
+        )
+
     article_counts_df = count_articles_by_company(company_df)
     share_of_voice_df = add_share_of_voice(article_counts_df)
 
@@ -291,6 +351,26 @@ def compute_share_of_voice(df):
     logging.info("Computed share of voice for %s companies",
                  len(share_of_voice_df))
     return share_of_voice_df
+
+
+def get_top_3_rows(df, metric_column):
+    """Return top 3 rows by the chosen metric column."""
+    if df.empty:
+        return df.copy()
+    return df.sort_values(by=metric_column, ascending=False).head(3).copy()
+
+
+def get_bottom_3_rows(df, metric_column):
+    """Return bottom 3 rows by the chosen metric column, excluding zero."""
+    if df.empty:
+        return df.copy()
+
+    non_zero_df = df[df[metric_column] > 0].copy()
+
+    if non_zero_df.empty:
+        return non_zero_df.copy()
+
+    return non_zero_df.sort_values(by=metric_column, ascending=True).head(3).copy()
 
 
 def main():
@@ -307,21 +387,31 @@ def main():
         return
 
     df = create_mentions_dataframe(items)
+
     mention_volume_df = compute_mention_volume(df)
-
-    top_3_companies = get_top_3_companies(mention_volume_df)
-    bottom_3_companies = get_bottom_3_companies(mention_volume_df)
-
     sentiment_distribution_df = compute_sentiment_distribution(df)
+    share_of_voice_df = compute_share_of_voice(df)
 
-    top_3_sentiment_companies = get_top_3_companies(sentiment_distribution_df)
-    bottom_3_sentiment_companies = get_bottom_3_companies(
-        sentiment_distribution_df)
+    top_3_companies = get_top_3_rows(mention_volume_df, "mention_volume")
+    bottom_3_companies = get_bottom_3_rows(mention_volume_df, "mention_volume")
 
-    share_of_voice = compute_share_of_voice(df)
+    top_3_sentiment_companies = get_top_3_rows(
+        sentiment_distribution_df,
+        "positive_pct"
+    )
+    bottom_3_sentiment_companies = get_bottom_3_rows(
+        sentiment_distribution_df,
+        "positive_pct"
+    )
 
-    top_3_share_of_voice_companies = get_top_3_companies(share_of_voice)
-    bottom_3_share_of_voice_companies = get_bottom_3_companies(share_of_voice)
+    top_3_share_of_voice_companies = get_top_3_rows(
+        share_of_voice_df,
+        "share_of_voice"
+    )
+    bottom_3_share_of_voice_companies = get_bottom_3_rows(
+        share_of_voice_df,
+        "share_of_voice"
+    )
 
     print("\nTop 3 Companies by Mention Volume")
     print(top_3_companies)

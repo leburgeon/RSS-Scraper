@@ -3,9 +3,9 @@ import pandas as pd
 from metrics import (
     create_mentions_dataframe,
     compute_mention_volume,
-    get_top_3_companies,
-    get_bottom_3_companies,
     filter_company_sentiment_rows,
+    get_top_3_rows,
+    get_bottom_3_rows,
     count_sentiment_by_company,
     add_sentiment_percentages,
     compute_sentiment_distribution,
@@ -152,7 +152,7 @@ def test_compute_mention_volume_sorts_highest_first():
     assert result.iloc[1]["mention_volume"] == 1
 
 
-def test_get_top_3_companies_returns_first_three_rows():
+def test_get_top_3_rows_returns_first_three_rows():
     mention_volume_df = pd.DataFrame([
         {"entity_id": "c1", "entity_name": "A",
             "entity_type": "company", "mention_volume": 10},
@@ -164,13 +164,13 @@ def test_get_top_3_companies_returns_first_three_rows():
             "entity_type": "company", "mention_volume": 4},
     ])
 
-    result = get_top_3_companies(mention_volume_df)
+    result = get_top_3_rows(mention_volume_df, "mention_volume")
 
     assert len(result) == 3
     assert list(result["entity_id"]) == ["c1", "c2", "c3"]
 
 
-def test_get_bottom_3_companies_returns_lowest_non_zero_rows():
+def test_get_bottom_3_rows_returns_lowest_non_zero_rows():
     mention_volume_df = pd.DataFrame([
         {"entity_id": "c1", "entity_name": "A",
             "entity_type": "company", "mention_volume": 10},
@@ -184,14 +184,14 @@ def test_get_bottom_3_companies_returns_lowest_non_zero_rows():
             "entity_type": "company", "mention_volume": 3},
     ])
 
-    result = get_bottom_3_companies(mention_volume_df)
+    result = get_bottom_3_rows(mention_volume_df, "mention_volume")
 
     assert len(result) == 3
     assert list(result["entity_id"]) == ["c3", "c2", "c5"]
     assert all(result["mention_volume"] > 0)
 
 
-def test_get_bottom_3_companies_returns_fewer_if_less_than_three_non_zero():
+def test_get_bottom_3_rows_returns_fewer_if_less_than_three_non_zero():
     mention_volume_df = pd.DataFrame([
         {"entity_id": "c1", "entity_name": "A",
             "entity_type": "company", "mention_volume": 0},
@@ -201,7 +201,7 @@ def test_get_bottom_3_companies_returns_fewer_if_less_than_three_non_zero():
             "entity_type": "company", "mention_volume": 1},
     ])
 
-    result = get_bottom_3_companies(mention_volume_df)
+    result = get_bottom_3_rows(mention_volume_df, "mention_volume")
 
     assert len(result) == 2
     assert list(result["entity_id"]) == ["c3", "c2"]
