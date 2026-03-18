@@ -1,0 +1,40 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "eu-west-1"
+}
+
+# Ensure this is ALL LOWERCASE when you run apply
+variable "bucket_name" {
+  type = string
+}
+
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = var.bucket_name
+}
+
+resource "aws_s3_bucket_versioning" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+output "config_snippet" {
+  value = <<EOT
+  backend "s3" {
+    bucket  = "${aws_s3_bucket.terraform_state.id}"
+    key     = "global/s3/terraform.tfstate"
+    region  = "eu-west-1"
+    encrypt = true
+    # dynamodb_table removed due to permissions
+  }
+EOT
+}
