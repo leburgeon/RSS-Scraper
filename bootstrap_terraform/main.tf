@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "aws" {
-  region = "eu-west-1"
+  region = "eu-west-2"
 }
 
 # Ensure this is ALL LOWERCASE when you run apply
@@ -32,7 +32,7 @@ output "config_snippet" {
   backend "s3" {
     bucket  = "${aws_s3_bucket.terraform_state.id}"
     key     = "global/s3/terraform.tfstate"
-    region  = "eu-west-1"
+    region  = "eu-west-2"
     encrypt = true
     # dynamodb_table removed due to permissions
   }
