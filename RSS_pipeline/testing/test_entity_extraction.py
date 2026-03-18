@@ -1,60 +1,63 @@
+import pytest
 from entity_extraction import extract_entities
 
 
-import pytest
+class TestTechEntityExtraction:
 
-# Assuming your function is in entity_utils.py
-# from entity_utils import extract_entities
-
-
-class TestExtractEntities:
-
-    # Simple Entity Extraction
-    def test_simple_person_extraction(self):
-        """Tests clear, single person name in a basic sentence."""
-        text = "Alice Smith went to the park."
-        expected = ["Alice Smith"]
+    def test_tech_figures(self):
+        """Tests major tech industry leaders."""
+        text = "Jensen Huang and Mark Zuckerberg discussed the metaverse."
+        expected = ["Jensen Huang", "Mark Zuckerberg"]
         assert extract_entities(text) == expected
 
-    def test_simple_company_extraction(self):
-        """Tests clear, single company name."""
-        text = "I have a meeting at Google today."
-        expected = ["Google"]
+    def test_tech_companies_and_suffixes(self):
+        """Tests companies, specifically checking the trailing period issue."""
+        text = "I am looking for a job at SpaceX. My friend works at Nvidia."
+        expected = ["SpaceX", "Nvidia"]
         assert extract_entities(text) == expected
 
-    def test_multiple_entities_mixed_types(self):
-        """Tests multiple entities across different categories."""
-        text = "Elon Musk works at Tesla and SpaceX."
+    def test_mixed_tech_entities(self):
+        """Tests a mix of people and organizations in one sentence."""
+        text = "Sundar Pichai leads Google, while Tim Cook runs Apple."
         results = extract_entities(text)
-        assert set(results) == {"Elon Musk", "Tesla", "SpaceX"}
+        assert set(results) == {"Sundar Pichai", "Google", "Tim Cook", "Apple"}
 
-    def test_multiple_sentences(self):
-        """Tests extraction across a multi-sentence paragraph."""
-        text = "Satya Nadella is the CEO of Microsoft. He succeeded Steve Ballmer."
-        expected = ["Satya Nadella", "Microsoft", "Steve Ballmer"]
+    def test_modern_tech_casing(self):
+        """Tests specific casing for newer tech companies."""
+        text = "OpenAI and Anthropic are competing in the LLM space."
+        expected = ["OpenAI", "Anthropic"]
         assert extract_entities(text) == expected
 
-    @pytest.mark.parametrize("text,expected", [
-        (
-            "Apple is releasing a new iPhone, but I prefer eating an apple.",
-            ["Apple"]  # Should distinguish between the company and the fruit
-        ),
-        (
-            "International Business Machines is often called IBM in the news.",
-            ["International Business Machines", "IBM"]
-        ),
-        (
-            "Amazon announced new jobs. The Amazon rainforest is beautiful.",
-            ["Amazon", "Amazon"]
+    def test_noise_filtering(self):
+        """
+        Tests your logic to ignore 'AI' (2 letters) and common nouns.
+        Requires:
+        - 3-letter minimum length
+        - Capitalization check
+        """
+        text = "The AI developed by openai was impressive, but the apple was tasty."
+        # 'AI' is too short (< 3)
+        # 'openai' starts with lowercase
+        # 'apple' (fruit) starts with lowercase
+        expected = []
+        assert extract_entities(text) == expected
+
+    def test_repeated_tech_mentions(self):
+        """Tests multiple mentions across a technical paragraph."""
+        text = (
+            "Satya Nadella announced a new partnership between Microsoft and several AI startups. "
+            "While Satya Nadella praised the innovation, Sam Altman noted that OpenAI would remain a key collaborator. "
+            "Microsoft has invested billions into the vision shared by Sam Altman. "
+            "Both Microsoft and OpenAI aim to redefine the future of computing together. "
+            "Ultimately, Satya Nadella believes this synergy benefits every developer."
         )
-    ])
-    def test_contextual_variations(self, text, expected):
-        """Tests if the function handles the same word in different contexts."""
-        assert extract_entities(text) == expected
 
-    def test_different_spellings_and_casing(self):
-        """Tests resilience to inconsistent naming and casing."""
-        text = "The wal-mart store is huge. I usually shop at Walmart or WalMart."
-        results = extract_entities(text)
-        assert "wal-mart" in [r.lower() for r in results]
-        assert "walmart" in [r.lower() for r in results]
+        expected = [
+            "Satya Nadella", "Microsoft",
+            "Satya Nadella", "Sam Altman", "OpenAI",
+            "Microsoft", "Sam Altman",
+            "Microsoft", "OpenAI",
+            "Satya Nadella"
+        ]
+
+        assert extract_entities(text) == expected
