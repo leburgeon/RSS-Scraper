@@ -207,6 +207,92 @@ def compute_sentiment_distribution(df):
     return sentiment_distribution_df
 
 
+logging.basicConfig(level=logging.INFO)
+
+
+# Share of Voice functions
+
+def filter_company_article_rows(df):
+    """Keep only company rows and the columns needed for share of voice."""
+    logging.info("Filtering company article rows")
+
+    company_df = df[df["entity_type"] == "company"].copy()
+    company_df = company_df[
+        ["entity_id", "entity_name", "entity_type", "article_id"]
+    ].dropna()
+
+    return company_df
+
+
+def count_articles_by_company(company_df):
+    """
+    Count distinct articles for each company.
+
+    A company appearing multiple times in the same article
+    should only count once for article count.
+    """
+    logging.info("Counting distinct articles by company")
+
+    company_df = company_df.drop_duplicates(subset=["entity_id", "article_id"])
+
+    article_counts_df = (
+        company_df.groupby(
+            ["entity_id", "entity_name", "entity_type"],
+            as_index=False
+        )
+        .agg(article_count=("article_id", "count"))
+    )
+
+    return article_counts_df
+
+
+def add_share_of_voice(article_counts_df):
+    """
+    Add share_of_voice column.
+
+    share_of_voice =
+    company article count / total article mentions across tracked companies
+    """
+    logging.info("Adding share of voice")
+
+    total_article_mentions = article_counts_df["article_count"].sum()
+
+    if total_article_mentions == 0:
+        article_counts_df["share_of_voice"] = 0
+    else:
+        article_counts_df["share_of_voice"] = (
+            article_counts_df["article_count"] / total_article_mentions
+        )
+
+    return article_counts_df
+
+
+def compute_share_of_voice(df):
+    """
+    Compute share of voice for each company.
+
+    Expected columns:
+    - entity_id
+    - entity_name
+    - entity_type
+    - article_id
+    """
+    logging.info("Computing share of voice")
+
+    company_df = filter_company_article_rows(df)
+    article_counts_df = count_articles_by_company(company_df)
+    share_of_voice_df = add_share_of_voice(article_counts_df)
+
+    share_of_voice_df = share_of_voice_df.sort_values(
+        by="share_of_voice",
+        ascending=False
+    ).reset_index(drop=True)
+
+    logging.info("Computed share of voice for %s companies",
+                 len(share_of_voice_df))
+    return share_of_voice_df
+
+
 def main():
     table_name = "c22_charlie_media_mvp"
     region_name = "eu-west-2"
@@ -226,14 +312,34 @@ def main():
     top_3_companies = get_top_3_companies(mention_volume_df)
     bottom_3_companies = get_bottom_3_companies(mention_volume_df)
 
+    sentiment_distribution_df = compute_sentiment_distribution(df)
+
+    top_3_sentiment_companies = get_top_3_companies(sentiment_distribution_df)
+    bottom_3_sentiment_companies = get_bottom_3_companies(
+        sentiment_distribution_df)
+
+    share_of_voice = compute_share_of_voice(df)
+
+    top_3_share_of_voice_companies = get_top_3_companies(share_of_voice)
+    bottom_3_share_of_voice_companies = get_bottom_3_companies(share_of_voice)
+
     print("\nTop 3 Companies by Mention Volume")
     print(top_3_companies)
 
     print("\nBottom 3 Companies by Mention Volume")
     print(bottom_3_companies)
 
-    print("\nMention Volume Results")
-    print(mention_volume_df)
+    print("\nTop 3 Companies by Positive Sentiment Percentage")
+    print(top_3_sentiment_companies)
+
+    print("\nBottom 3 Companies by Positive Sentiment Percentage")
+    print(bottom_3_sentiment_companies)
+
+    print("\nTop 3 Companies by Share of Voice")
+    print(top_3_share_of_voice_companies)
+
+    print("\nBottom 3 Companies by Share of Voice")
+    print(bottom_3_share_of_voice_companies)
 
 
 if __name__ == "__main__":
