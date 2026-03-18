@@ -75,8 +75,7 @@ if __name__ == "__main__":
 
     articles = poll_rss_feed_for_articles(feed_url)
     
-    print(f"Found {len(articles)} articles in the RSS feed.")
-
-    filtered_articles = filter_articles_by_date(articles, "Mon, 16 Mar 2026 07:14:05 GMT")
-    print(f"{len(filtered_articles)} articles published after the specified date.")
-        
+    html_content = get_html_content_from_article_link(articles[0]['link'])
+    article_text = extract_article_content(html_content)
+    print(article_text)
+    print(articles[0]['link'])
