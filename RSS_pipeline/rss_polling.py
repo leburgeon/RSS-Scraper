@@ -4,7 +4,7 @@ from datetime import datetime
 import feedparser
 import requests
 import logging
-import beautifulsoup4
+from bs4 import BeautifulSoup
 
 logging.basicConfig(level=logging.INFO)
 
@@ -28,11 +28,12 @@ def poll_rss_feed_for_articles(feed_url) -> list:
 
     return articles
 
+def filter_articles_by_date(articles: list[dict], most_recent_date: str) -> list[dict]:
+    """Filter out articles that are before a certain date"""
+    most_recent_date = datetime.strptime(most_recent_date, '%a, %d %b %Y %H:%M:%S %Z')
 
-
-def filter_articles_by_guid(articles: list[dict], most_recent_date: datetime) -> list[dict]:
-    """Filter out articles that are after a certain date"""
     filtered_articles = []
+
     for article in articles:
         publish_date_str = article.get('publish_date')
         if publish_date_str:
@@ -60,7 +61,7 @@ def get_html_content_from_article_link(article_link) -> str:
 def extract_article_content(html_content) -> str:
     """Extract the main content of the article from its HTML."""
     try:
-        soup = beautifulsoup4.BeautifulSoup(html_content, 'html.parser')
+        soup = BeautifulSoup(html_content, 'html.parser')
         # This is a very basic extraction method. You may want to use more sophisticated methods or libraries like newspaper3k.
         paragraphs = soup.find_all('p')
         article_text = '\n'.join([para.get_text() for para in paragraphs])
@@ -74,11 +75,8 @@ if __name__ == "__main__":
 
     articles = poll_rss_feed_for_articles(feed_url)
     
-    html_content = get_html_content_from_article_link(articles[0]['link'])
+    print(f"Found {len(articles)} articles in the RSS feed.")
 
-    if html_content:
-        article_text = extract_article_content(html_content)
-
-        with open('article_content.txt', 'w') as f:
-            f.write(article_text)
+    filtered_articles = filter_articles_by_date(articles, "Mon, 16 Mar 2026 07:14:05 GMT")
+    print(f"{len(filtered_articles)} articles published after the specified date.")
         
