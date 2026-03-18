@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 import logging
-import json
 from pydantic import BaseModel
 from typing import List, Literal
 
@@ -49,13 +48,9 @@ load_dotenv()
 
 def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> dict[str:str]:
     """Extracts the sentiment for each entity mentioned in the article, alongside the count of these mentions.
-
     Each entry is a dictionary in the form {entity: [sentiment, count]}.
-
     If an entity is mentioned in a positive and negative light, two entries will be made.
-
     'entities' will contain duplicates and these duplicates should be removed in the analysis.
-
     This function uses an LLM API to analyse the sentiment of the article.
 
     """
@@ -69,7 +64,8 @@ e.g. {{"entity_name": "OpenAI",
 
 Article: {article}. Ensure that you capture the sentiment of each mention of the entity. 
 If an entity is mentioned in a positive and negative light, two entries should be made. 
-The same rationale is applied to neutral mentions. The output should be in the format of a dictionary
+The same rationale is applied to neutral mentions. However, if for a single entity, there is only positive and neutral, or, negative and neutral:
+Only the positive/negative sentiments should be counted and the neutral should be ignored. The output should be in the format of a dictionary
 where the keys are the entities and the values are lists containing the sentiment and count of mentions,
 e.g. {{"entity_name": "OpenAI",
   "entity_type": "company",
@@ -87,23 +83,17 @@ def get_LLM_response(prompt: str) -> dict:
 
     client = genai.Client()
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=EntityResponse,
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=EntityResponse,
+            )
         )
-    )
+    except Exception as e:
+        logging.error(f"Error connecting to LLM: {e}")
+        return []
 
     return [item.model_dump() for item in response.parsed.entities]
-
-
-print(
-    extract_sentiments_and_counts_per_entity(
-    "Apple's new iPhone has received positive reviews," \
-    "but some users have reported negative experiences with the battery life." \
-    "Overall, the product is seen as a significant improvement over previous models.",
-    ["Apple"]
-    )
-)
