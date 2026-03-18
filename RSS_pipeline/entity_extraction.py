@@ -69,6 +69,7 @@ def extract_entities(text: str) -> List[str]:
     target_labels = {"PERSON", "ORG", "PRODUCT", "GPE"}
 
     entities = []
+    
     for ent in doc.ents:
         if ent.label_ in target_labels:
 
