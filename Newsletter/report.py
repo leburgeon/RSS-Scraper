@@ -1,44 +1,138 @@
+""" Script to generate the HTML report for the newsletter using 
+defined metrics for mention volume, sentiment distribution and share of voice. 
+Compatible for lambda function too"""
+
 import logging
 from pathlib import Path
+import plotly.graph_objects as go
 
 from metrics import (
-    get_yesterday_date,
-    get_dynamodb_table,
-    get_mention_items_for_date,
-    create_mentions_dataframe,
+    yesterday_date,
+    retrieve_dynamodb_table,
+    mentions_dataframe_creation,
     compute_mention_volume,
-    compute_sentiment_distribution,
-    compute_share_of_voice,
+    sentiment_distribution_calculate,
+    share_of_voice_calculate,
+    mention_items_for_date,
+    top_3_rows,
+    bottom_3_rows,
 )
 
 
 logging.basicConfig(level=logging.INFO)
 
 
-def get_top_3_rows(df, metric_column):
-    """Return top 3 rows for a chosen metric column."""
-    return df.sort_values(by=metric_column, ascending=False).head(3).copy()
+def format_metric_value(value, metric_type):
+    """Format metric values for display in the report."""
+    if metric_type == "mention_volume":
+        return str(int(value))
+
+    if metric_type in ["positive_pct", "negative_pct", "share_of_voice"]:
+        return f"{round(value * 100, 2)}%"
+
+    return str(value)
 
 
-def get_bottom_3_rows(df, metric_column):
-    """Return bottom 3 rows for a chosen metric column, excluding zero values."""
-    non_zero_df = df[df[metric_column] > 0].copy()
-    return non_zero_df.sort_values(by=metric_column, ascending=True).head(3).copy()
+def build_metric_table(df, metric_column):
+    """Simple df with company name and metric to include in report"""
+
+    mapping = {
+        "mention_volume": "Mention Volume",
+        "positive_pct": "Positive Sentiment",
+        "share_of_voice": "Share of Voice",
+    }
+
+    metric_table_df = df[["entity_name", metric_column]].copy()
+
+    metric_table_df[metric_column] = metric_table_df[metric_column].apply(
+        lambda value: format_metric_value(value, metric_column)
+    )
+    metric_table_df["Company Name"] = metric_table_df["entity_name"]
+
+    metric_table_df = metric_table_df[["Company Name", metric_column]].rename(
+        columns={metric_column: mapping[metric_column]}
+    )
+
+    return metric_table_df
 
 
-def format_percentage_columns(df, percentage_columns):
-    """Convert decimal percentage columns into readable percentage strings."""
-    formatted_df = df.copy()
+def build_sentiment_bar_chart(sentiment_df, title):
+    """grouped bar chart for company sentiment distribution"""
 
-    for column in percentage_columns:
-        if column in formatted_df.columns:
-            formatted_df[column] = (
-                formatted_df[column] * 100).round(2).astype(str) + "%"
+    if sentiment_df.empty:
+        return f"""
+        <section class="card full-width">
+            <h2>{title}</h2>
+            <p>No data available.</p>
+        </section>
+        """
 
-    return formatted_df
+    company_names = sentiment_df["entity_name"].tolist()
+    positive_values = (sentiment_df["positive_pct"] * 100).round(2).tolist()
+    neutral_values = (sentiment_df["neutral_pct"] * 100).round(2).tolist()
+    negative_values = (sentiment_df["negative_pct"] * 100).round(2).tolist()
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Bar(
+            name="Positive",
+            x=company_names,
+            y=positive_values,
+            text=[f"{value}%" for value in positive_values],
+            textposition="outside",
+            marker_color="limegreen"
+        )
+    )
+
+    fig.add_trace(
+        go.Bar(
+            name="Neutral",
+            x=company_names,
+            y=neutral_values,
+            text=[f"{value}%" for value in neutral_values],
+            textposition="outside",
+            marker_color="blue"
+        )
+    )
+
+    fig.add_trace(
+        go.Bar(
+            name="Negative",
+            x=company_names,
+            y=negative_values,
+            text=[f"{value}%" for value in negative_values],
+            textposition="outside",
+            marker_color="red"
+        )
+    )
+
+    fig.update_layout(
+        barmode="group",
+        title=title,
+        xaxis_title="Company Name",
+        yaxis_title="Sentiment Percentage",
+        yaxis={"range": [0, 100]},
+        margin={"l": 40, "r": 20, "t": 60, "b": 40},
+        height=450,
+        template="plotly_white",
+        legend_title="Sentiment",
+    )
+
+    chart_html = fig.to_html(
+        full_html=False,  # Only return the div for the chart, not a full HTML document
+        include_plotlyjs="cdn",
+        config={"displayModeBar": False},
+    )
+
+    return f"""
+    <section class="card full-width">
+        {chart_html}
+    </section>
+    """
 
 
-def dataframe_to_html_table(df, title):
+def dataframe_to_html_table(df, title, subheading):
     """Convert a DataFrame into a styled HTML table."""
     if df.empty:
         return f"""
@@ -53,6 +147,7 @@ def dataframe_to_html_table(df, title):
     return f"""
     <section class="card">
         <h2>{title}</h2>
+        <h3>{subheading}</h3>
         {table_html}
     </section>
     """
@@ -60,12 +155,12 @@ def dataframe_to_html_table(df, title):
 
 def build_html_report(
     report_date,
-    top_mention_volume_df,
-    bottom_mention_volume_df,
-    top_sentiment_df,
-    bottom_sentiment_df,
-    top_share_of_voice_df,
-    bottom_share_of_voice_df,
+    top_mention_volume_table,
+    top_sentiment_chart_html,
+    top_share_of_voice_table,
+    bottom_mention_volume_table,
+    bottom_sentiment_chart_html,
+    bottom_share_of_voice_table,
 ):
     """Build the full HTML report."""
     html = f"""
@@ -92,7 +187,7 @@ def build_html_report(
             }}
             .grid {{
                 display: grid;
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
                 gap: 20px;
             }}
             .card {{
@@ -100,6 +195,9 @@ def build_html_report(
                 padding: 20px;
                 border-radius: 10px;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            }}
+            .full-width {{
+                grid-column: 1 / -1;
             }}
             .report-table {{
                 width: 100%;
@@ -115,6 +213,12 @@ def build_html_report(
             .report-table th {{
                 background-color: #f0f0f0;
             }}
+            h2 {{
+                margin-top: 0;
+            }}
+            .section-heading {{
+                margin-bottom: 0;
+            }}
         </style>
     </head>
     <body>
@@ -122,14 +226,26 @@ def build_html_report(
         <p class="subtitle">Report date: {report_date}</p>
 
         <div class="grid">
-            {dataframe_to_html_table(top_mention_volume_df, "Top 3 Companies by Mention Volume")}
-            {dataframe_to_html_table(bottom_mention_volume_df, "Bottom 3 Companies by Mention Volume")}
+            <section class="card full-width">
+                <h2 class="section-heading"><u>Top 3 Companies</u></h2>
+            </section>
 
-            {dataframe_to_html_table(top_sentiment_df, "Top 3 Companies by Positive Sentiment")}
-            {dataframe_to_html_table(bottom_sentiment_df, "Bottom 3 Companies by Positive Sentiment")}
+            {dataframe_to_html_table(top_mention_volume_table, "Mention Volume",
+                                     subheading="Companies appearing in the most unique articles yesterday")}
 
-            {dataframe_to_html_table(top_share_of_voice_df, "Top 3 Companies by Share of Voice")}
-            {dataframe_to_html_table(bottom_share_of_voice_df, "Bottom 3 Companies by Share of Voice")}
+            {dataframe_to_html_table(top_share_of_voice_table, "Share of Voice",
+                                         subheading="Companies most discussed across all mentions yesterday")}
+            {top_sentiment_chart_html}
+
+            <section class="card full-width">
+                <h2 class="section-heading"><u>Bottom 3 Companies</u></h2>
+            </section>
+
+            {dataframe_to_html_table(bottom_mention_volume_table, "Mention Volume",
+                                             subheading="Companies appearing in the fewest unique articles yesterday")}
+            {dataframe_to_html_table(bottom_share_of_voice_table, "Share of Voice",
+                                                 subheading="Companies least discussed across all mentions yesterday")}
+            {bottom_sentiment_chart_html}
         </div>
     </body>
     </html>
@@ -145,11 +261,11 @@ def save_html_report(html_content, output_path):
 
 def generate_report_html(table_name, region_name):
     """Run the report pipeline and return the HTML string."""
-    report_date = get_yesterday_date()
+    report_date = yesterday_date()
     logging.info("Generating HTML report for %s", report_date)
 
-    table = get_dynamodb_table(table_name, region_name)
-    items = get_mention_items_for_date(table, report_date)
+    table = retrieve_dynamodb_table(table_name, region_name)
+    items = mention_items_for_date(table, report_date)
 
     if not items:
         logging.info("No mention items found for yesterday")
@@ -163,75 +279,60 @@ def generate_report_html(table_name, region_name):
         </html>
         """
 
-    df = create_mentions_dataframe(items)
+    df = mentions_dataframe_creation(items)
 
     mention_volume_df = compute_mention_volume(df)
-    sentiment_distribution_df = compute_sentiment_distribution(df)
-    share_of_voice_df = compute_share_of_voice(df)
+    sentiment_distribution_df = sentiment_distribution_calculate(df)
+    share_of_voice_df = share_of_voice_calculate(df)
+    top_mention_volume_df = top_3_rows(mention_volume_df, "mention_volume")
+    bottom_mention_volume_df = bottom_3_rows(
+        mention_volume_df, "mention_volume")
 
-    top_mention_volume_df = get_top_3_rows(
-        mention_volume_df,
-        "mention_volume"
-    )
-    bottom_mention_volume_df = get_bottom_3_rows(
-        mention_volume_df,
-        "mention_volume"
-    )
+    top_sentiment_df = top_3_rows(
+        sentiment_distribution_df, "positive_pct")
+    bottom_sentiment_df = top_3_rows(
+        sentiment_distribution_df, "negative_pct")
 
-    top_sentiment_df = get_top_3_rows(
-        sentiment_distribution_df,
-        "positive_pct"
-    )
-    bottom_sentiment_df = get_bottom_3_rows(
-        sentiment_distribution_df,
-        "positive_pct"
-    )
+    top_share_of_voice_df = top_3_rows(
+        share_of_voice_df, "share_of_voice")
 
-    top_share_of_voice_df = get_top_3_rows(
-        share_of_voice_df,
-        "share_of_voice"
-    )
-    bottom_share_of_voice_df = get_bottom_3_rows(
-        share_of_voice_df,
-        "share_of_voice"
-    )
+    bottom_share_of_voice_df = bottom_3_rows(
+        share_of_voice_df, "share_of_voice")
 
-    top_sentiment_df = format_percentage_columns(
-        top_sentiment_df,
-        ["positive_pct", "neutral_pct", "negative_pct"]
-    )
-    bottom_sentiment_df = format_percentage_columns(
-        bottom_sentiment_df,
-        ["positive_pct", "neutral_pct", "negative_pct"]
-    )
-    top_share_of_voice_df = format_percentage_columns(
-        top_share_of_voice_df,
-        ["share_of_voice"]
-    )
-    bottom_share_of_voice_df = format_percentage_columns(
-        bottom_share_of_voice_df,
-        ["share_of_voice"]
-    )
+    top_mention_volume_table = build_metric_table(
+        top_mention_volume_df, "mention_volume")
+
+    bottom_mention_volume_table = build_metric_table(
+        bottom_mention_volume_df, "mention_volume")
+
+    top_share_of_voice_table = build_metric_table(
+        top_share_of_voice_df, "share_of_voice")
+
+    bottom_share_of_voice_table = build_metric_table(
+        bottom_share_of_voice_df, "share_of_voice")
+
+    top_sentiment_chart_html = build_sentiment_bar_chart(
+        top_sentiment_df, "Companies most positively talked about yesterday")
+
+    bottom_sentiment_chart_html = build_sentiment_bar_chart(
+        bottom_sentiment_df, "Companies most negatively talked about companies yesterday")
 
     html_report = build_html_report(
         report_date=report_date,
-        top_mention_volume_df=top_mention_volume_df,
-        bottom_mention_volume_df=bottom_mention_volume_df,
-        top_sentiment_df=top_sentiment_df,
-        bottom_sentiment_df=bottom_sentiment_df,
-        top_share_of_voice_df=top_share_of_voice_df,
-        bottom_share_of_voice_df=bottom_share_of_voice_df,
+        top_mention_volume_table=top_mention_volume_table,
+        top_sentiment_chart_html=top_sentiment_chart_html,
+        top_share_of_voice_table=top_share_of_voice_table,
+        bottom_mention_volume_table=bottom_mention_volume_table,
+        bottom_sentiment_chart_html=bottom_sentiment_chart_html,
+        bottom_share_of_voice_table=bottom_share_of_voice_table,
     )
 
     return html_report
 
 
 def lambda_handler(event, context):
-    """
-    AWS Lambda entry point.
+    """Returns the HTML report in the response body for the Lambda function."""
 
-    Returns the HTML report in the response body.
-    """
     table_name = "c22_charlie_media_mvp"
     region_name = "eu-west-2"
 
@@ -247,7 +348,8 @@ def lambda_handler(event, context):
 
 
 def main():
-    """Local entry point for testing."""
+    """Main function to generate and save the HTML report locally."""
+
     table_name = "c22_charlie_media_mvp"
     region_name = "eu-west-2"
 
