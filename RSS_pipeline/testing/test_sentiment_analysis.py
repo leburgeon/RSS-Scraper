@@ -1,4 +1,4 @@
-from pipeline import extract_sentiments_and_counts_per_entity
+from sentiment_extraction import extract_sentiments_and_counts_per_entity
 from entity_extraction import extract_entities
 
 
@@ -100,3 +100,4 @@ def test_extract_sentiments_and_counts_per_entity_irrelevant_entities():
     result = extract_sentiments_and_counts_per_entity(article, entities)
     expected_result = []
     assert result == expected_result
+

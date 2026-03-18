@@ -38,6 +38,7 @@ def setup_nlp() -> spacy.language.Language:
 
         patterns = [{"label": "ORG", "pattern": [{"LOWER": name.lower()}]}
                     for name in tech_companies]
+        
         ruler.add_patterns(patterns)
 
     return nlp
