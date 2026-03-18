@@ -71,6 +71,7 @@ def extract_article_content(html_content) -> str:
         return None
     
 if __name__ == "__main__":
+    # Simple tests to show that the functions work
     feed_url = "https://www.theguardian.com/technology/rss"  # Replace with your RSS feed URL
 
     articles = poll_rss_feed_for_articles(feed_url)
