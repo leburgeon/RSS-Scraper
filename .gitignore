@@ -205,3 +205,29 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+# Local terraform directory (contains binaries)
+.terraform/
+
+# State backup files
+*.tfstate.backup
+
+# Sensitive variable files (if you ever use them)
+*.tfvars
+*.tfvars.json
+
+# Crash logs
+crash.log
+
+# Ignore the actual project state (once you move to S3)
+# Note: Since your bootstrap is special, you'll commit its state specifically.
+
+# Ignore the provider binaries (the heavy stuff)
+**/.terraform/
+
+# Ignore state backups
+*.tfstate.backup
+
+# Ignore any local state for the NEXT projects
+# (We will keep the bootstrap one manually)
