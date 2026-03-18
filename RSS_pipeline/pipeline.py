@@ -8,16 +8,27 @@ If the article mentions an entity in a positive and negative light, two entries 
 
 """
 
-import csv
-import json
-import io
-import os
+
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 import logging
+import json
+from pydantic import BaseModel
+from typing import List, Literal
 
 from entity_extraction import extract_entities
+
+
+class EntityAnalysis(BaseModel):
+    entity_name: str
+    entity_type: Literal["company", "person", "unknown"]
+    mention_count: int
+    sentiment: Literal["positive", "negative", "neutral", "unknown"]
+
+class EntityResponse(BaseModel):
+    entities: List[EntityAnalysis]
+
 
 def set_up_logger():
     """Set up a logger for the pipeline. This logger will print messages to the console
@@ -33,15 +44,14 @@ def set_up_logger():
     return logger
 
 
-
 load_dotenv()
 
 
-def extract_sentiments_and_counts_per_entity(article:str, entities:list) -> dict[str:str]:
+def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> dict[str:str]:
     """Extracts the sentiment for each entity mentioned in the article, alongside the count of these mentions.
 
     Each entry is a dictionary in the form {entity: [sentiment, count]}.
-    
+
     If an entity is mentioned in a positive and negative light, two entries will be made.
 
     'entities' will contain duplicates and these duplicates should be removed in the analysis.
@@ -51,17 +61,49 @@ def extract_sentiments_and_counts_per_entity(article:str, entities:list) -> dict
     """
 
     prompt = f"""Given the following article, determine the sentiment of each mention of the following entities: {entities}.
+and return a dictionary in the following format.
+e.g. {{"entity_name": "OpenAI",
+  "entity_type": "company",
+  "mention_count": 5
+  "sentiment": "positive"}}
 
 Article: {article}. Ensure that you capture the sentiment of each mention of the entity. 
 If an entity is mentioned in a positive and negative light, two entries should be made. 
 The same rationale is applied to neutral mentions. The output should be in the format of a dictionary
 where the keys are the entities and the values are lists containing the sentiment and count of mentions,
-e.g. {{"Apple": ["positive", 3], "Apple": ["negative", 1]}}."""
-    
-    get_LLM_response(prompt)
-    
+e.g. {{"entity_name": "OpenAI",
+  "entity_type": "company",
+  "mention_count": 5
+  "sentiment": "positive"}}.
+  The entity_type should be either 'company or 'person'. If you are unsure, ignore this field
+  as it is likely to be inaccurate. The sentiment should be either 'positive', 'negative' or 'neutral'.
+  If you are unsure, ignore this field as it is likely to be inaccurate."""
+
+    return get_LLM_response(prompt)
 
 
-def get_LLM_response(prompt:str) -> dict:
+def get_LLM_response(prompt: str) -> dict:
+    """Sends an LLM prompt to the Gemini API and returns the response as a dictionary."""
 
-    pass
+    client = genai.Client()
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=EntityResponse,
+        )
+    )
+
+    return [item.model_dump() for item in response.parsed.entities]
+
+
+print(
+    extract_sentiments_and_counts_per_entity(
+    "Apple's new iPhone has received positive reviews," \
+    "but some users have reported negative experiences with the battery life." \
+    "Overall, the product is seen as a significant improvement over previous models.",
+    ["Apple"]
+    )
+)

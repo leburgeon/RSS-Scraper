@@ -1,9 +1,6 @@
 from pipeline import extract_sentiments_and_counts_per_entity
 
 
-
-
-
 def test_extract_sentiments_and_counts_per_entity():
     article = """Apple's new iPhone has received positive reviews,
     but some users have reported negative experiences with the battery life.
@@ -13,10 +10,14 @@ def test_extract_sentiments_and_counts_per_entity():
 
     result = extract_sentiments_and_counts_per_entity(article, entities)
 
-    expected_result = {
-        "Apple": ["positive", 1],
-        "Apple": ["negative", 1]
-    }
-
+    expected_result = [
+        {"entity_name": "Apple",
+         "entity_type": "company",
+         "mention_count": 2,
+         "sentiment": "positive"},
+        {"entity_name": "Apple",
+         "entity_type": "company",
+         "mention_count": 1,
+            "sentiment": "negative"}
+    ]
     assert result == expected_result
-    
