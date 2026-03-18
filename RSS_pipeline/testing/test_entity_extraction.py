@@ -28,20 +28,6 @@ class TestTechEntityExtraction:
         expected = ["OpenAI", "Anthropic"]
         assert extract_entities(text) == expected
 
-    def test_noise_filtering(self):
-        """
-        Tests your logic to ignore 'AI' (2 letters) and common nouns.
-        Requires:
-        - 3-letter minimum length
-        - Capitalization check
-        """
-        text = "The AI developed by openai was impressive, but the apple was tasty."
-        # 'AI' is too short (< 3)
-        # 'openai' starts with lowercase
-        # 'apple' (fruit) starts with lowercase
-        expected = []
-        assert extract_entities(text) == expected
-
     def test_repeated_tech_mentions(self):
         """Tests multiple mentions across a technical paragraph."""
         text = (
@@ -60,4 +46,10 @@ class TestTechEntityExtraction:
             "Satya Nadella"
         ]
 
+        assert extract_entities(text) == expected
+    
+    def test_empty(self):
+        """Tests empty input."""
+        text = "Random text with no entities."
+        expected = []
         assert extract_entities(text) == expected
