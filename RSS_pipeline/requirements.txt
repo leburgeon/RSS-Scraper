@@ -1,3 +1,5 @@
+feedparser
+requests
 spacy
 pytest
 # After installing spacy, run:
