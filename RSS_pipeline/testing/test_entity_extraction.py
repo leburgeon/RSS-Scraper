@@ -53,3 +53,9 @@ class TestTechEntityExtraction:
         text = "Random text with no entities."
         expected = []
         assert extract_entities(text) == expected
+
+    def test_random_sentence(self):
+        """Tests a random sentence with no tech entities."""
+        text = "OpenAI is a leading AI research lab, but this sentence mentions no larger CEO names. However, this sentence does mention Tesco for completness."
+        expected = ["OpenAI", "Tesco"]
+        assert extract_entities(text) == expected
