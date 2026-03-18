@@ -52,8 +52,11 @@ def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> di
     If an entity is mentioned in a positive and negative light, two entries will be made.
     'entities' will contain duplicates and these duplicates should be removed in the analysis.
     This function uses an LLM API to analyse the sentiment of the article.
-
     """
+
+    if article == "" or entities == []:
+        logging.warning("Empty article or entity list provided to extract_sentiments_and_counts_per_entity.")
+        return []
 
     prompt = f"""Given the following article, determine the sentiment of each mention of the following entities: {entities}.
 and return a dictionary in the following format.
@@ -74,6 +77,7 @@ e.g. {{"entity_name": "OpenAI",
   The entity_type should be either 'company or 'person'. If you are unsure, ignore this field
   as it is likely to be inaccurate. The sentiment should be either 'positive', 'negative' or 'neutral'.
   If you are unsure, ignore this field as it is likely to be inaccurate."""
+
 
     return get_LLM_response(prompt)
 

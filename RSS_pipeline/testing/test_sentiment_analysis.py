@@ -91,3 +91,12 @@ def test_entity_extraction_and_sentiment_analysis_integration_no_info():
     result = extract_sentiments_and_counts_per_entity(article, entities)
     expected_result = []
     assert result == expected_result
+
+def test_extract_sentiments_and_counts_per_entity_irrelevant_entities():
+
+    article = """The new software update has been released."""
+    entities = ["Apple", "Google"]
+
+    result = extract_sentiments_and_counts_per_entity(article, entities)
+    expected_result = []
+    assert result == expected_result
