@@ -15,6 +15,8 @@ def setup_nlp() -> spacy.language.Language:
 
     nlp = spacy.load("en_core_web_sm")
 
+
+    # Add stricter suffix rules to prevent splitting entities like "spaceX." into "spaceX"
     suffixes = nlp.Defaults.suffixes + [r'\.$']
     suffix_re = compile_suffix_regex(suffixes)
     nlp.tokenizer.suffix_search = suffix_re.search
@@ -39,7 +41,7 @@ def extract_entities(text: str) -> List[str]:
 
     doc = nlp(text)
 
-    target_labels = {"PERSON", "ORG", "GPE", "LOC", "PRODUCT"}
+    target_labels = {"PERSON", "ORG", "PRODUCT"}
 
     entities = []
     for ent in doc.ents:

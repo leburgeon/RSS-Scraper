@@ -22,11 +22,9 @@ class TestExtractEntities:
         expected = ["Google"]
         assert extract_entities(text) == expected
 
-    # Multiple Entities and Sentences
     def test_multiple_entities_mixed_types(self):
         """Tests multiple entities across different categories."""
         text = "Elon Musk works at Tesla and SpaceX."
-        # Using set comparison if order doesn't matter
         results = extract_entities(text)
         assert set(results) == {"Elon Musk", "Tesla", "SpaceX"}
 
@@ -36,7 +34,6 @@ class TestExtractEntities:
         expected = ["Satya Nadella", "Microsoft", "Steve Ballmer"]
         assert extract_entities(text) == expected
 
-    # Complex Context and Spelling Variations
     @pytest.mark.parametrize("text,expected", [
         (
             "Apple is releasing a new iPhone, but I prefer eating an apple.",
@@ -48,7 +45,6 @@ class TestExtractEntities:
         ),
         (
             "Amazon announced new jobs. The Amazon rainforest is beautiful.",
-            # Depending on your logic, both might be entities (Org vs Loc)
             ["Amazon", "Amazon"]
         )
     ])
@@ -60,6 +56,5 @@ class TestExtractEntities:
         """Tests resilience to inconsistent naming and casing."""
         text = "The wal-mart store is huge. I usually shop at Walmart or WalMart."
         results = extract_entities(text)
-        # We check that all variations were captured
         assert "wal-mart" in [r.lower() for r in results]
         assert "walmart" in [r.lower() for r in results]
