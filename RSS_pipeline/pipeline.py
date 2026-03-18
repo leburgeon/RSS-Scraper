@@ -39,6 +39,8 @@ load_dotenv()
 
 def extract_sentiments_and_counts_per_entity(article:str, entities:list) -> dict[str:str]:
     """Extracts the sentiment for each entity mentioned in the article, alongside the count of these mentions.
+
+    Each entry is a dictionary in the form {entity: [sentiment, count]}.
     
     If an entity is mentioned in a positive and negative light, two entries will be made.
 
