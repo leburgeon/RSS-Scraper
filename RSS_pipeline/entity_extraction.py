@@ -44,10 +44,10 @@ def setup_nlp() -> spacy.language.Language:
     return nlp
 
 
-nlp = setup_nlp()
+# nlp = setup_nlp()
 
 
-def extract_entities(text: str) -> List[str]:
+def extract_entities(text: str, nlp) -> List[str]:
     """
     Extract named entities from the given text using spaCy.
 

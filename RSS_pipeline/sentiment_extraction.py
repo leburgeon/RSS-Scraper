@@ -21,9 +21,9 @@ from entity_extraction import extract_entities
 
 class EntityAnalysis(BaseModel):
     entity_name: str
-    entity_type: Literal["company", "person", "unknown"]
+    entity_type: Literal["company", "person"]
     mention_count: int
-    sentiment: Literal["positive", "negative", "neutral", "unknown"]
+    sentiment: Literal["positive", "negative", "neutral"]
 
 class EntityResponse(BaseModel):
     entities: List[EntityAnalysis]
@@ -57,6 +57,8 @@ def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> di
     if article == "" or entities == []:
         logging.warning("Empty article or entity list provided to extract_sentiments_and_counts_per_entity.")
         return []
+    
+    entities = list(set(entities))  # Remove duplicates from the entity list
 
     prompt = f"""Given the following article, determine the sentiment of each mention of the following entities: {entities}.
 and return a dictionary in the following format.
