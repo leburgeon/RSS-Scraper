@@ -93,13 +93,13 @@ def load_entity_mentions(entity_mentions, table):
 def main():
 
     # DELETE THIS
-    update_feed_latest_article_date("FEED#guardian-tech", "2026-03-19T00:00:00", boto3.resource('dynamodb').Table(TABLE_NAME))
+    update_feed_latest_article_date("FEED#guardian-tech", "2026-03-01T00:00:00", boto3.resource('dynamodb').Table(TABLE_NAME))
 
     # Get the most recent article date from the database to filter new articles
     table = boto3.resource('dynamodb').Table(TABLE_NAME)
 
     # Extract the articles from the RSS feed and filter by date
-    articles_to_load = extract_articles(table)[:1]
+    articles_to_load = extract_articles(table)
 
     # Load the articles into the database and update the most recent article date for the feed
     load_articles(articles_to_load, table)

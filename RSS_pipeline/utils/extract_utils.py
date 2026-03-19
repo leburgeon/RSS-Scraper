@@ -49,7 +49,7 @@ class Article:
         try:
             html_content = Article._get_html_content_from_article_link(article_link)
             soup = BeautifulSoup(html_content, 'html.parser')
-            # This is a very basic extraction method. You may want to use more sophisticated methods or libraries like newspaper3k.
+            
             paragraphs = soup.find_all('p')
             article_text = '\n'.join([para.get_text() for para in paragraphs])
             return article_text

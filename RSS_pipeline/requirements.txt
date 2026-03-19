@@ -7,8 +7,6 @@ google-genai
 pydantic
 spaCy
 boto3
-# After installing, run:
-# pip install google-genai
 
 annotated-doc==0.0.4
 annotated-types==0.7.0
