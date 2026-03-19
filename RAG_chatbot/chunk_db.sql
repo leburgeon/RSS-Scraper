@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Create chunks table for storing article chunks and embeddings
 CREATE TABLE IF NOT EXISTS chunks (
   chunk_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
