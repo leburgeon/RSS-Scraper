@@ -1,7 +1,7 @@
-data "aws_subnets" "c22_private" {
+data "aws_subnets" "c22_public" {
   filter {
     name   = "tag:Name"
-    values = ["c22-private-subnet-1", "c22-private-subnet-2", "c22-private-subnet-3"]
+    values = ["c22-public-subnet-1", "c22-public-subnet-2", "c22-public-subnet-3"]
   }
   filter {
     name   = "vpc-id"
@@ -67,10 +67,21 @@ resource "aws_security_group_rule" "lambda_to_rds_ingress" {
   description              = "Allow Lambda to connect to RDS"
 }
 
-# DB subnet group
+# Allow local machine to connect to RDS (for MVP schema setup)
+resource "aws_security_group_rule" "local_to_rds_ingress" {
+  type              = "ingress"
+  from_port         = 5432
+  to_port           = 5432
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.rds.id
+  description       = "Allow public access (MVP only - remove in production)"
+}
+
+# DB subnet group (now using public subnets)
 resource "aws_db_subnet_group" "rag_db_subnet_group" {
   name       = "c22-rag-db-subnet-group"
-  subnet_ids = data.aws_subnets.c22_private.ids
+  subnet_ids = data.aws_subnets.c22_public.ids
 
   tags = {
     Name = "c22-rag-db-subnet-group"
@@ -105,7 +116,7 @@ resource "aws_secretsmanager_secret_version" "rds_master_password" {
   })
 }
 
-# RDS PostgreSQL instance
+# RDS PostgreSQL instance (now publicly accessible)
 resource "aws_db_instance" "rag_db" {
   identifier              = "c22-media-rag-db"
   engine                  = "postgres"
@@ -118,7 +129,7 @@ resource "aws_db_instance" "rag_db" {
   password                = random_password.rds_master_password.result
   db_subnet_group_name    = aws_db_subnet_group.rag_db_subnet_group.name
   vpc_security_group_ids  = [aws_security_group.rds.id]
-  publicly_accessible     = false
+  publicly_accessible     = true
   skip_final_snapshot     = true
   multi_az                = false
 
