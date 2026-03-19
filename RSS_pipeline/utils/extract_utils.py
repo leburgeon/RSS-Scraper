@@ -10,7 +10,51 @@ import hashlib
 logging.basicConfig(level=logging.INFO)
 
 
-def poll_rss_feed_for_articles(feed_url) -> list:
+class Article:
+    def __init__(self, pk: str, article_guid: str, title: str, published_at: datetime):
+        self.pk = pk
+        self.sk = "meta"
+        self.article_guid = article_guid
+        self.title = title
+        self.published_at = published_at
+        self.article_content = Article._extract_article_content(article_guid)
+
+    def to_item_format(self) -> dict: 
+        return {
+            "pk": self.pk,
+            "sk": self.sk,
+            "article_guid": self.article_guid,
+            "title": self.title,
+            "article_content": self.article_content,
+            "published_at": self.published_at.isoformat()
+        }
+    
+    def _get_html_content_from_article_link(article_link) -> str:
+        """Fetch the HTML content of the article from its link."""
+        try:
+            response = requests.get(article_link)
+            response.raise_for_status()  # Check if the request was successful
+            return response.text
+        except requests.RequestException as e:
+            logging.error(
+                f"Error fetching article content from {article_link}: {e}")
+            return None
+        
+    def _extract_article_content(article_link) -> str:
+        """Extract the main content of an article from its article link."""
+        try:
+            html_content = Article._get_html_content_from_article_link(article_link)
+            soup = BeautifulSoup(html_content, 'html.parser')
+            # This is a very basic extraction method. You may want to use more sophisticated methods or libraries like newspaper3k.
+            paragraphs = soup.find_all('p')
+            article_text = '\n'.join([para.get_text() for para in paragraphs])
+            return article_text
+        except Exception as e:
+            logging.error(f"Error extracting article content: {e}")
+            return None
+
+
+def poll_rss_feed_for_articles(feed_url) -> list[Article]:
     """
     Polls RSS data using feedparser and returns a list of articles.
     """
@@ -20,79 +64,25 @@ def poll_rss_feed_for_articles(feed_url) -> list:
     articles = []
 
     for entry in feed.entries:
-        articles.append({
-            "title": entry.get('title'),
-            "publish_date": entry.get('published'),
-            "article_guid": entry.get('id')
-        })
+        
+        articles.append(Article(        
+            pk=entry.get('id'),
+            article_guid=entry.get('id'),
+            title=entry.get('title'),
+            published_at=datetime.strptime(entry.get('published'), '%a, %d %b %Y %H:%M:%S %Z')
+        ))
 
     return articles
 
 
-def filter_articles_by_date(articles: list[dict], most_recent_date: str) -> list[dict]:
+def filter_articles_by_date(articles: list[Article], most_recent_date: str) -> list[Article]:
     """Filter out articles that are before a certain date"""
-    most_recent_date = datetime.strptime(
-        most_recent_date, '%a, %d %b %Y %H:%M:%S %Z')
-
-    filtered_articles = []
-
-    for article in articles:
-        publish_date_str = article.get('publish_date')
-        if publish_date_str:
-            try:
-                publish_date = datetime.strptime(
-                    publish_date_str, '%a, %d %b %Y %H:%M:%S %Z')
-                if publish_date > most_recent_date:
-                    filtered_articles.append(article)
-            except ValueError as e:
-                logging.error(
-                    f"Error parsing publish date '{publish_date_str}': {e}")
-
-    return filtered_articles
 
 
-def get_html_content_from_article_link(article_link) -> str:
-    """Fetch the HTML content of the article from its link."""
-    try:
-        response = requests.get(article_link)
-        response.raise_for_status()  # Check if the request was successful
-        return response.text
-    except requests.RequestException as e:
-        logging.error(
-            f"Error fetching article content from {article_link}: {e}")
-        return None
 
 
-def extract_article_content(html_content) -> str:
-    """Extract the main content of the article from its HTML."""
-    try:
-        soup = BeautifulSoup(html_content, 'html.parser')
-        # This is a very basic extraction method. You may want to use more sophisticated methods or libraries like newspaper3k.
-        paragraphs = soup.find_all('p')
-        article_text = '\n'.join([para.get_text() for para in paragraphs])
-        return article_text
-    except Exception as e:
-        logging.error(f"Error extracting article content: {e}")
-        return None
 
 
-def generate_article_id(feed_id: str, guid: str) -> str:
-    """
-    Generate a unique article ID based on feed ID and article GUID.
-    """
-    unique_id = hashlib.sha256(guid.encode('utf-8')).hexdigest()
-
-    return f"{feed_id}#{unique_id}"
 
 
-if __name__ == "__main__":
-    # Simple tests to show that the functions work
-    # Replace with your RSS feed URL
-    feed_url = "https://www.theguardian.com/technology/rss"
 
-    articles = poll_rss_feed_for_articles(feed_url)
-
-    html_content = get_html_content_from_article_link(articles[0]['link'])
-    article_text = extract_article_content(html_content)
-    print(article_text)
-    print(articles[0]['link'])
