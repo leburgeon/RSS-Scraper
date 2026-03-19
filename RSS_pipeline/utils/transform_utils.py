@@ -25,12 +25,12 @@ class EntityAnalysis(BaseModel):
     """Schema for a single entity sentiment."""
     entity_name: str
     entity_type: Literal[
-        "company", "person"
+        "company"
     ]
     mention_count: int
     sentiment: Literal[
         "positive", "negative",
-        "neutral", "unknown"
+        "neutral"
     ]
 
 
@@ -41,6 +41,7 @@ class EntityResponse(BaseModel):
 
 class EntityMention:
     """Class representing an entity mention extracted from the article content, enriched with article metadata."""
+
     def __init__(self, entity_name: str, entity_type: str, mention_count: int, sentiment: str):
         self.entity_name = entity_name
         self.entity_type = entity_type
@@ -68,14 +69,14 @@ class EntityMention:
             "article_guid": self.article_guid,
             "item_type": self.item_type
         }
-    
+
     @staticmethod
     def enrich_entity_mentions_with_article_metadata(entity_mentions: list["EntityMention"], article: Article) -> list["EntityMention"]:
         """ Enrich the extracted entity mentions with article metadata for downstream processing and analysis."""
         for entity in entity_mentions:
             entity.enrich_with_article_metadata(article)
         return entity_mentions
-    
+
 
 def _call_llm(prompt: str, schema: type) -> object | None:
     """
@@ -124,12 +125,10 @@ def setup_nlp() -> spacy.language.Language:
 
         patterns = [{"label": "ORG", "pattern": [{"LOWER": name.lower()}]}
                     for name in tech_companies]
-        
+
         ruler.add_patterns(patterns)
 
     return nlp
-
-
 
 
 def extract_entities(text: str, nlp) -> List[str]:
@@ -140,7 +139,7 @@ def extract_entities(text: str, nlp) -> List[str]:
     common named-entity labels such as PERSON and ORG. Duplicates
     (multiple mentions) are preserved.
     """
-    
+
     if not text:
         return []
 
@@ -155,7 +154,7 @@ def extract_entities(text: str, nlp) -> List[str]:
     target_labels = {"ORG", "PRODUCT"}
 
     entities = []
-    
+
     for ent in doc.ents:
         if ent.label_ in target_labels:
 
@@ -168,6 +167,7 @@ def extract_entities(text: str, nlp) -> List[str]:
 
     return entities
 
+
 def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> list[EntityMention]:
     """Extracts the sentiment for each entity mentioned in the article, alongside the count of these mentions.
     Each entry is a dictionary in the form {entity: [sentiment, count]}.
@@ -177,7 +177,8 @@ def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> li
     """
 
     if article == "" or entities == []:
-        logging.warning("Empty article or entity list provided to extract_sentiments_and_counts_per_entity.")
+        logging.warning(
+            "Empty article or entity list provided to extract_sentiments_and_counts_per_entity.")
         return []
 
     prompt = f"""Given the following article, determine the sentiment of each mention of the following entities: {entities}.
@@ -199,10 +200,10 @@ def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> li
         The sentiment should be either 'positive', 'negative' or 'neutral'.
         If you are unsure, ignore this field as it is likely to be inaccurate."""
 
-
     llm_response = get_LLM_response(prompt)
 
     return extract_entity_mentions_from_llm_response(llm_response)
+
 
 def extract_entity_mentions_from_llm_response(llm_response: list[dict]) -> list[EntityMention]:
     """Convert LLM response to list of EntityMention objects."""
@@ -217,9 +218,11 @@ def extract_entity_mentions_from_llm_response(llm_response: list[dict]) -> list[
             )
             entity_mentions.append(entity_mention)
         except KeyError as e:
-            logging.warning(f"Missing expected field in LLM response item: {e}. Item: {item}")
+            logging.warning(
+                f"Missing expected field in LLM response item: {e}. Item: {item}")
             continue
     return entity_mentions
+
 
 def get_LLM_response(prompt: str) -> list[dict]:
     """Send prompt to Gemini; return list of serialised EntityAnalysis dicts.

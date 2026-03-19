@@ -1,6 +1,7 @@
 from typing import Any
 import logging
 import boto3
+from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,20 +48,23 @@ if __name__ == "__main__":
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table("c22-rss-scraper-table")
 
-    feed_metadata_example = {
-        "PK": "FEED#guardian-tech",
+    feed_metadata_techcrunch = {
+        "PK": "FEED#techcrunch",
         "SK": "META",
         "item_type": "FEED",
-        "feed_url": "https://www.theguardian.com/uk/technology/rss",
+        "feed_url": "https://techcrunch.com/feed/",
         "latest_article_date": ""
     }
 
-    insert_feed_metadata(feed_metadata_example, table)
+    insert_feed_metadata(feed_metadata_techcrunch, table)
 
     # Update the latest article date
     update_feed_latest_article_date(
-        "FEED#guardian-tech", "2024-06-01T12:00:00Z", table)
+        "FEED#techcrunch", (datetime.now() - timedelta(days=1)).isoformat(), table)
 
     # Retrieve the latest article date
-    latest_date = get_latest_article_date("FEED#guardian-tech", table)
-    logger.info(f"Latest article date for FEED#guardian-tech: {latest_date}")
+    latest_date = get_latest_article_date(
+        "FEED#techcrunch", table)
+    logger.info(
+        f"Latest article date for FEED#techcrunch: {latest_date}")
+    print(type(latest_date))

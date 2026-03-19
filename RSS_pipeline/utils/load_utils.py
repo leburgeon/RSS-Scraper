@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import boto3
 import logging
 from typing import Any
@@ -8,11 +10,8 @@ def logging_setup():
     logging.basicConfig(level=logging.INFO)
     return logging.getLogger(__name__)
 
-logger = logging_setup()    
 
-
-
-
+logger = logging_setup()
 
 
 def insert_item(item: dict, table: Any):
@@ -46,7 +45,8 @@ def insert_items(items: list[dict], table: Any):
         logger.error(f"Error inserting items: {e}")
         raise
 
-def insert_feed_metadata(feed_metadata, table: Any):
+
+def insert_feed_metadata(feed_metadata: dict, table: Any):
     # Code to insert feed metadata into the database
 
     try:
@@ -56,7 +56,7 @@ def insert_feed_metadata(feed_metadata, table: Any):
         logger.error(f"Error inserting feed metadata: {e}")
 
 
-def update_feed_latest_article_date(feed_pk, new_date, table: Any):
+def update_feed_latest_article_date(feed_pk: str, new_date: str, table: Any):
     # Code to update existing feed metadata in the database
     try:
         table.update_item(
@@ -70,7 +70,7 @@ def update_feed_latest_article_date(feed_pk, new_date, table: Any):
         logger.error(f"Error updating feed metadata: {e}")
 
 
-def get_latest_article_date(feed_pk, table: Any):
+def get_latest_article_date(feed_pk: str, table: Any) -> str | None:
     # Code to retrieve the latest article date for a given feed
     try:
         response = table.get_item(Key={"PK": feed_pk, "SK": "META"})
@@ -87,20 +87,23 @@ if __name__ == "__main__":
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table("c22-rss-scraper-table")
 
-    feed_metadata_example = {
-        "PK": "FEED#guardian-tech",
+    feed_metadata_techcrunch = {
+        "PK": "FEED#techcrunch",
         "SK": "META",
         "item_type": "FEED",
-        "feed_url": "https://www.theguardian.com/uk/technology/rss",
+        "feed_url": "https://techcrunch.com/feed/",
         "latest_article_date": ""
     }
 
-    insert_feed_metadata(feed_metadata_example, table)
+    insert_feed_metadata(feed_metadata_techcrunch, table)
 
     # Update the latest article date
     update_feed_latest_article_date(
-        "FEED#guardian-tech", "2024-06-01T12:00:00Z", table)
+        "FEED#techcrunch", str((datetime.now() - timedelta(days=1)).isoformat()), table)
 
     # Retrieve the latest article date
-    latest_date = get_latest_article_date("FEED#guardian-tech", table)
-    logger.info(f"Latest article date for FEED#guardian-tech: {latest_date}")
+    latest_date = get_latest_article_date(
+        "FEED#techcrunch", table)
+    logger.info(
+        f"Latest article date for FEED#techcrunch: {latest_date}")
+    print(type(latest_date))
