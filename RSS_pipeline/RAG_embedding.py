@@ -55,3 +55,4 @@ def split_article_to_chunks(article: str, chunk_size: int = 500) -> list[str]:
         i += chunk_size - overlap
 
     return chunks
+
