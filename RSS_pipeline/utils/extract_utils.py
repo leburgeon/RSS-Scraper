@@ -5,17 +5,12 @@ import feedparser
 import requests
 import logging
 from bs4 import BeautifulSoup
-import hashlib
 
 logging.basicConfig(level=logging.INFO)
-
-
-def extract_latest_article_date_from_db(table_name) -> str:
-    """Query the database to get the most recent article date for the feed."""
-    # This is a placeholder implementation. You would replace this with your actual database query logic.
     
 
 class Article:
+    """Class representing an article extracted from the RSS feed."""
     def __init__(self, article_guid: str, title: str, published_at: datetime):
         self.pk = Article._generate_pk_for_article(article_guid)
         self.sk = "META"
@@ -25,6 +20,7 @@ class Article:
         self.article_content = Article._extract_article_content(article_guid)
 
     def to_item_format(self) -> dict: 
+        """Convert the Article object to a dictionary format suitable for database insertion."""
         return {
             "PK": self.pk,
             "SK": self.sk,

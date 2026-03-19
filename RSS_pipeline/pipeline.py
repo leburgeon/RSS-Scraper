@@ -2,7 +2,6 @@ import logging
 import os
 
 from utils.extract_utils import poll_rss_feed_for_articles, filter_articles_by_date
-from utils.extract_utils import Article
 from utils.transform_utils import (
     EntityMention,
     extract_entities,

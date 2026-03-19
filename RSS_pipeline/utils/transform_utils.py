@@ -40,6 +40,7 @@ class EntityResponse(BaseModel):
 
 
 class EntityMention:
+    """Class representing an entity mention extracted from the article content, enriched with article metadata."""
     def __init__(self, entity_name: str, entity_type: str, mention_count: int, sentiment: str):
         self.entity_name = entity_name
         self.entity_type = entity_type
@@ -76,10 +77,7 @@ class EntityMention:
         return entity_mentions
     
 
-def _call_llm(
-    prompt: str,
-    schema: type,
-) -> object | None:
+def _call_llm(prompt: str, schema: type) -> object | None:
     """
     Send a structured prompt to Gemini.
     Returns parsed response or None on error.
@@ -101,6 +99,7 @@ def _call_llm(
 
 
 def setup_nlp() -> spacy.language.Language:
+    """Set up the spaCy NLP pipeline with custom entity recognition rules."""
 
     nlp = spacy.load("en_core_web_sm")
 
