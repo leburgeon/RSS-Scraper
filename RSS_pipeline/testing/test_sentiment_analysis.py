@@ -1,5 +1,5 @@
 from sentiment_extraction import extract_sentiments_and_counts_per_entity
-from entity_extraction import extract_entities
+from RSS_pipeline.entity_extraction_utils import extract_entities
 
 
 def test_extract_sentiments_and_counts_per_entity():

@@ -22,10 +22,8 @@ def poll_rss_feed_for_articles(feed_url) -> list:
     for entry in feed.entries:
         articles.append({
             "title": entry.get('title'),
-            "link": entry.get('link'),
             "publish_date": entry.get('published'),
-            "guid": entry.get('id'),
-            "summary": entry.get('summary')
+            "article_guid": entry.get('id')
         })
 
     return articles

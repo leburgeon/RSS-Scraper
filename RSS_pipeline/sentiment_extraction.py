@@ -16,7 +16,7 @@ import logging
 from pydantic import BaseModel
 from typing import List, Literal
 
-from entity_extraction import extract_entities
+from RSS_pipeline.entity_extraction_utils import extract_entities
 
 
 class EntityAnalysis(BaseModel):
