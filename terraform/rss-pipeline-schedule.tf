@@ -1,12 +1,12 @@
 # Creates an Elastic Container Registry (ECR) to store the scraper's Docker images
 resource "aws_ecr_repository" "c22_rss_scraper_repository" {
-  name                 = "c22_rss_scraper_repository"
+  name                 = "c22-rss-scraper-repository"
   image_tag_mutability = "MUTABLE"
 }
 
 # Creates a DynamoDB table to store the parsed RSS feed items
 resource "aws_dynamodb_table" "c22_rss_scraper_table" {
-  name         = "c22_rss_scraper_table"
+  name         = "c22-rss-scraper-table"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id"
   attribute {
@@ -17,18 +17,18 @@ resource "aws_dynamodb_table" "c22_rss_scraper_table" {
 
 # Creates an ECS Cluster, acting as a logical grouping for the Fargate tasks
 resource "aws_ecs_cluster" "c22_rss_scraper_cluster" {
-  name = "c22_rss_scraper_cluster"
+  name = "c22-rss-scraper-cluster"
 }
 
 # Creates a CloudWatch log group with a 14-day retention to store scraper logs
 resource "aws_cloudwatch_log_group" "c22_rss_scraper_log_group" {
-  name              = "c22_rss_scraper_log_group"
+  name              = "c22-rss-scraper-log-group"
   retention_in_days = 14
 }
 
 # Defines a security group allowing the scraper task to reach the internet (HTTPS port 443)
 resource "aws_security_group" "c22_rss_scraper_sg" {
-  name        = "c22_rss_scraper_security_group"
+  name        = "c22-rss-scraper-security-group"
   description = "Allow outbound HTTPS for RSS scraping"
   vpc_id      = data.aws_vpc.c22_vpc.id
 
@@ -42,7 +42,7 @@ resource "aws_security_group" "c22_rss_scraper_sg" {
 
 # Creates the IAM role assumed by the ECS task to pull images, log, and access DynamoDB
 resource "aws_iam_role" "c22_rss_scraper_role" {
-  name = "c22_rss_scraper_role"
+  name = "c22-rss-scraper-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -61,7 +61,7 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
 
 # Creates a custom IAM policy granting the scraper permission to read/write to the DynamoDB table
 resource "aws_iam_policy" "c22_rss_scraper_policy" {
-  name = "c22_rss_scraper_policy"
+  name = "c22-rss-scraper-policy"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -82,7 +82,7 @@ resource "aws_iam_role_policy_attachment" "c22_rss_scraper_custom_attach" {
 
 # Defines the ECS task blueprint, including CPU, memory, Docker image, and log routing
 resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
-  family                   = "c22_rss_scraper_task_definition"
+  family                   = "c22-rss-scraper-task-definition"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -91,7 +91,7 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
   task_role_arn            = aws_iam_role.c22_rss_scraper_role.arn
 
   container_definitions = jsonencode([{
-    name      = "c22_rss_scraper_container"
+    name      = "c22-rss-scraper-container"
     image     = "${aws_ecr_repository.c22_rss_scraper_repository.repository_url}:latest"
     essential = true
     logConfiguration = {
@@ -99,7 +99,7 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
       options = {
         "awslogs-group"         = aws_cloudwatch_log_group.c22_rss_scraper_log_group.name
         "awslogs-region"        = data.aws_region.current.name
-        "awslogs-stream-prefix" = "c22_rss_scraper"
+        "awslogs-stream-prefix" = "c22-rss-scraper"
       }
     }
   }])
@@ -107,7 +107,7 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
 
 # Creates the IAM role assumed by the EventBridge Scheduler to trigger the task
 resource "aws_iam_role" "c22_rss_scraper_scheduler_role" {
-  name = "c22_rss_scraper_scheduler_role"
+  name = "c22-rss-scraper-scheduler-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -120,7 +120,7 @@ resource "aws_iam_role" "c22_rss_scraper_scheduler_role" {
 
 # Creates a policy allowing the Scheduler to run the ECS task and pass the required IAM roles
 resource "aws_iam_policy" "c22_rss_scraper_scheduler_policy" {
-  name = "c22_rss_scraper_scheduler_policy"
+  name = "c22-rss-scraper-scheduler-policy"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -146,7 +146,7 @@ resource "aws_iam_role_policy_attachment" "c22_rss_scraper_scheduler_attach" {
 
 # Creates an EventBridge Schedule to trigger the ECS Fargate task every hour
 resource "aws_scheduler_schedule" "c22_rss_scraper_schedule" {
-  name                = "c22_rss_scraper_schedule"
+  name                = "c22-rss-scraper-schedule"
   schedule_expression = "rate(1 hour)"
 
   flexible_time_window { mode = "OFF" }
