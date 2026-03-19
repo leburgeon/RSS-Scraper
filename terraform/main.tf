@@ -1,3 +1,4 @@
+# Configures Terraform, required providers, and the S3 backend for remote state
 terraform {
   required_providers {
     aws = {
@@ -14,11 +15,15 @@ terraform {
   }
 }
 
+# Configures the AWS provider and default region
 provider "aws" {
   region = "eu-west-2"
 }
 
-# Data for the vpc
+# Fetches the current AWS region dynamically for use in other resources
+data "aws_region" "current" {}
+
+# Fetches the existing VPC using its Name tag
 data "aws_vpc" "c22_vpc" {
   filter {
     name   = "tag:Name"
@@ -26,32 +31,10 @@ data "aws_vpc" "c22_vpc" {
   }
 }
 
-# Verify that the VPC exists
-resource "aws_vpc" "c22_vpc" {
-  id = data.aws_vpc.c22_vpc.id
-}
-
-# Data for public subnets in the VPC
+# Fetches existing public subnets in the VPC using their Name tags
 data "aws_subnets" "public_subnets" {
   filter {
     name   = "tag:Name"
     values = ["c22-public-subnet-*"]
-  }
-}
-
-# Verify that the public subnets exist
-resource "aws_subnets" "public_subnets" {
-  ids = data.aws_subnets.public_subnets.ids
-}
-
-# DynamoDB table for storing the rss feed data
-resource "aws_dynamodb_table" "c22_rss_scraper_table" {
-  name           = "c22_rss_scraper_table"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
-
-  attribute {
-    name = "id"
-    type = "S"
   }
 }
