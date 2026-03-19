@@ -1,10 +1,13 @@
 """Tests for mention volume metric calculation."""
 
+from botocore.exceptions import BotoCoreError, ClientError
+import pytest
+from unittest.mock import Mock, patch
 import pandas as pd
 
 from metrics import (
     filter_company_rows,
-    compute_mention_volume,)
+    compute_mention_volume, retrieve_dynamodb_table, mention_items_for_date)
 
 
 def sample_mentions_dataframe():
@@ -106,3 +109,118 @@ def test_compute_mention_volume_empty_dataframe():
     assert list(result_df.columns) == [
         "entity_name", "entity_type", "mention_volume"
     ]
+
+
+# @patch("metrics.boto3.resource")
+# def test_retrieve_dynamodb_table_success(mock_boto_resource):
+#     """Test that the DynamoDB table object is returned successfully."""
+#     mock_table = Mock()
+#     mock_dynamodb = Mock()
+
+#     mock_dynamodb.Table.return_value = mock_table
+#     mock_boto_resource.return_value = mock_dynamodb
+
+#     result = retrieve_dynamodb_table("test-table", "eu-west-2")
+
+#     mock_boto_resource.assert_called_once_with(
+#         "dynamodb", region_name="eu-west-2")
+#     mock_dynamodb.Table.assert_called_once_with("test-table")
+#     assert result == mock_table
+
+
+# @patch("metrics.boto3.resource")
+# def test_retrieve_dynamodb_table_client_error(mock_boto_resource):
+#     """Test that ClientError is raised if boto3 resource fails."""
+#     error_response = {
+#         "Error": {
+#             "Code": "ResourceNotFoundException",
+#             "Message": "Requested resource not found"
+#         }
+#     }
+
+#     mock_boto_resource.side_effect = ClientError(
+#         error_response, "DescribeTable")
+
+#     with pytest.raises(ClientError):
+#         retrieve_dynamodb_table("bad-table", "eu-west-2")
+
+
+# @patch("metrics.boto3.resource")
+# def test_retrieve_dynamodb_table_botocore_error(mock_boto_resource):
+#     """Test that BotoCoreError is raised if boto3 resource fails."""
+#     mock_boto_resource.side_effect = BotoCoreError()
+
+#     with pytest.raises(BotoCoreError):
+#         retrieve_dynamodb_table("test-table", "eu-west-2")
+
+
+# def test_mention_items_for_date_single_page():
+#     """Test mention_items_for_date when only one query page is returned."""
+#     mock_table = Mock()
+
+#     mock_table.query.return_value = {
+#         "Items": [
+#             {"PK": "MENTION_DATE#2026-03-18", "entity_name": "OpenAI"},
+#             {"PK": "MENTION_DATE#2026-03-18", "entity_name": "Google"}
+#         ]
+#     }
+
+#     result = mention_items_for_date(mock_table, "2026-03-18")
+
+#     assert len(result) == 2
+#     assert result[0]["entity_name"] == "OpenAI"
+#     assert result[1]["entity_name"] == "Google"
+#     assert mock_table.query.call_count == 1
+
+
+# def test_mention_items_for_date_multiple_pages():
+#     """Test mention_items_for_date when query pagination is needed."""
+#     mock_table = Mock()
+
+#     first_response = {
+#         "Items": [
+#             {"PK": "MENTION_DATE#2026-03-18", "entity_name": "OpenAI"}
+#         ],
+#         "LastEvaluatedKey": {"PK": "next-page"}
+#     }
+
+#     second_response = {
+#         "Items": [
+#             {"PK": "MENTION_DATE#2026-03-18", "entity_name": "Google"}
+#         ]
+#     }
+
+#     mock_table.query.side_effect = [first_response, second_response]
+
+#     result = mention_items_for_date(mock_table, "2026-03-18")
+
+#     assert len(result) == 2
+#     assert result[0]["entity_name"] == "OpenAI"
+#     assert result[1]["entity_name"] == "Google"
+#     assert mock_table.query.call_count == 2
+
+
+# def test_mention_items_for_date_client_error():
+#     """Test that ClientError is raised if query fails."""
+#     mock_table = Mock()
+
+#     error_response = {
+#         "Error": {
+#             "Code": "ProvisionedThroughputExceededException",
+#             "Message": "Throughput exceeded"
+#         }
+#     }
+
+#     mock_table.query.side_effect = ClientError(error_response, "Query")
+
+#     with pytest.raises(ClientError):
+#         mention_items_for_date(mock_table, "2026-03-18")
+
+
+# def test_mention_items_for_date_botocore_error():
+#     """Test that BotoCoreError is raised if query fails."""
+#     mock_table = Mock()
+#     mock_table.query.side_effect = BotoCoreError()
+
+#     with pytest.raises(BotoCoreError):
+#         mention_items_for_date(mock_table, "2026-03-18")

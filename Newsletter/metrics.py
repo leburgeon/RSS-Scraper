@@ -21,15 +21,12 @@ SOV= company article count/total articles
 # article id can be replaced for article_guid
 # entity id is replaced for entity_name
 
-
+import boto3
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import BotoCoreError, ClientError
 import logging
-from datetime import datetime, timedelta
-
-import boto3
 import pandas as pd
-from boto3.dynamodb.conditions import Key
-from botocore.exceptions import ClientError, BotoCoreError
+from datetime import date, datetime, timedelta
 
 
 logging.basicConfig(level=logging.INFO)
@@ -37,7 +34,7 @@ logging.basicConfig(level=logging.INFO)
 
 def yesterday_date():
     """Return yesterday's date as YYYY-MM-DD."""
-    yesterday = datetime.utcnow().date() - timedelta(days=1)
+    yesterday = datetime.utcnow().date()
     return str(yesterday)
 
 
@@ -113,8 +110,7 @@ def filter_company_rows(df: pd.DataFrame, required_columns: list, log_message: s
     logging.info(log_message)
 
     # and "people" is also a type of entity to be added
-    company_df = df[(df["entity_type"] == "company") |
-                    (df["entity_type"] == "people")].copy()
+    company_df = df[(df["entity_type"] == "company")].copy()
 
     if company_df.empty:
         return pd.DataFrame(columns=required_columns)
@@ -277,7 +273,7 @@ def filter_company_article_rows(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def articles_by_company_count(company_df: pd.DataFrame) -> pd.DataFrame:
-    """Summing total mentions across all articles for each company 
+    """Summing total mentions across all articles for each company
     to get article count for share of voice calculation."""
 
     logging.info("Counting total mentions by company")
@@ -381,7 +377,7 @@ def bottom_3_rows(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
 def main():
     """Main function to run the metrics calculations and print results."""
 
-    table_name = "c22_charlie_media_mvp"
+    table_name = "c22-rss-scraper-table"
     region_name = "eu-west-2"
 
     article_date = yesterday_date()
@@ -443,3 +439,53 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    # retrieve_dynamodb_table("c22-rss-scraper-table", "eu-west-2")
+    # mention_items_for_date(table=retrieve_dynamodb_table(
+    #     "c22-rss-scraper-table", "eu-west-2"), article_date=date.today().strftime("%Y-%m-%d"))
+
+
+# logging.basicConfig(level=logging.INFO)
+
+
+# def retrieve_dynamodb_table(table_name, region_name):
+#     """Connect to DynamoDB and return the table."""
+#     logging.info("Connecting to DynamoDB table: %s", table_name)
+#     dynamodb = boto3.resource("dynamodb", region_name=region_name)
+#     table = dynamodb.Table(table_name)
+#     return table
+
+
+# def test_dynamodb_connection(table_name, region_name):
+#     """Check that DynamoDB table connection works."""
+#     try:
+#         table = retrieve_dynamodb_table(table_name, region_name)
+
+#         # This makes a real request to AWS and confirms the table exists
+#         table.load()
+
+#         logging.info(
+#             "Successfully connected to DynamoDB table: %s", table_name)
+#         logging.info("Table status: %s", table.table_status)
+#         return True
+
+#     except (ClientError, BotoCoreError) as error:
+#         logging.error(
+#             "Failed to connect to DynamoDB table %s: %s", table_name, error)
+#         return False
+
+
+# def main():
+#     table_name = "c22-rss-scraper-table"
+#     region_name = "eu-west-2"
+
+#     success = test_dynamodb_connection(table_name, region_name)
+
+#     if success:
+#         print("DynamoDB connection successful")
+#     else:
+#         print("DynamoDB connection failed")
+
+
+# if __name__ == "__main__":
+#     main()

@@ -122,6 +122,7 @@ def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
 
     chart_html = fig.to_html(
         full_html=False,  # Only return the div for the chart, not a full HTML document
+        # Use the CDN version of Plotly.js to reduce the size of the HTML
         include_plotlyjs="cdn",
         config={"displayModeBar": False},
     )
@@ -351,7 +352,7 @@ def lambda_handler(event, context):
 def main():
     """Main function to generate and save the HTML report locally."""
 
-    table_name = "c22_charlie_media_mvp"
+    table_name = "c22-rss-scraper-table"
     region_name = "eu-west-2"
 
     html_report = generate_report_html(table_name, region_name)
