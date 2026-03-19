@@ -1,26 +1,22 @@
 feedparser
 requests
-spacy
 pytest
 beautifulsoup4
-# After installing spacy, run:
-# python3 -m spacy download en_core_web_md
+python-dotenv
+google-genai
+pydantic
+spaCy
+boto3
 
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.12.1
-blis==1.3.3
-catalogue==2.0.10
 certifi==2026.2.25
 cffi==2.0.0
 charset-normalizer==3.4.6
 click==8.3.1
-cloudpathlib==0.23.0
-confection==0.1.5
 cryptography==46.0.5
-cymem==2.0.13
 distro==1.9.0
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
 feedparser==6.0.12
 google-auth==2.49.1
 google-genai==1.68.0
@@ -33,11 +29,9 @@ Jinja2==3.1.6
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
-murmurhash==1.0.15
 numpy==2.4.3
 packaging==26.0
 pluggy==1.6.0
-preshed==3.0.12
 pyasn1==0.6.3
 pyasn1_modules==0.4.2
 pycparser==3.0
@@ -50,22 +44,11 @@ requests==2.32.5
 rich==14.3.3
 setuptools==82.0.1
 sgmllib3k==1.0.0
-shellingham==1.5.4
-smart_open==7.5.1
 sniffio==1.3.1
-spacy==3.8.11
-spacy-legacy==3.0.12
-spacy-loggers==1.0.5
-srsly==2.5.2
 tenacity==9.1.4
-thinc==8.3.10
 tqdm==4.67.3
-typer==0.24.1
-typer-slim==0.24.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.6.3
-wasabi==1.1.3
-weasel==0.4.3
 websockets==16.0
 wrapt==2.1.0
