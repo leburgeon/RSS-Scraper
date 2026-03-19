@@ -14,8 +14,6 @@ def extract_latest_article_date_from_db(table_name) -> str:
     """Query the database to get the most recent article date for the feed."""
     # This is a placeholder implementation. You would replace this with your actual database query logic.
     
-    
-
 
 class Article:
     def __init__(self, article_guid: str, title: str, published_at: datetime):
@@ -28,8 +26,8 @@ class Article:
 
     def to_item_format(self) -> dict: 
         return {
-            "pk": self.pk,
-            "sk": self.sk,
+            "PK": self.pk,
+            "SK": self.sk,
             "article_guid": self.article_guid,
             "title": self.title,
             "published_at": self.published_at.isoformat(),

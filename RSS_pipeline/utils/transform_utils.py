@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from typing import List, Literal
 import spacy
 from spacy.util import compile_suffix_regex
+from utils.extract_utils import Article
 
 load_dotenv()
 
@@ -37,6 +38,43 @@ class EntityResponse(BaseModel):
     """Schema for full sentiment response."""
     entities: List[EntityAnalysis]
 
+
+class EntityMention:
+    def __init__(self, entity_name: str, entity_type: str, mention_count: int, sentiment: str):
+        self.entity_name = entity_name
+        self.entity_type = entity_type
+        self.mention_count = mention_count
+        self.sentiment = sentiment
+        self.item_type = "MENTION"
+
+    def enrich_with_article_metadata(self, article: Article):
+        """Enrich entity with article metadata. This is useful for downstream processing and analysis."""
+        self.pk = f"MENTION_DATE#{article.published_at.date().isoformat()}"
+        self.sk = f"ENTITY_NAME#{self.entity_name}#ARTICLE_GUID#{article.article_guid}#SENTIMENT#{self.sentiment}"
+        self.article_publish_date = article.published_at
+        self.article_guid = article.article_guid
+
+    def to_item_format(self) -> dict:
+        """Convert the EntityMention object to a dictionary format suitable for database insertion."""
+        return {
+            "PK": self.pk,
+            "SK": self.sk,
+            "entity_name": self.entity_name,
+            "entity_type": self.entity_type,
+            "mention_count": self.mention_count,
+            "sentiment": self.sentiment,
+            "published_at": self.article_publish_date.isoformat(),
+            "article_guid": self.article_guid,
+            "item_type": self.item_type
+        }
+    
+    @staticmethod
+    def enrich_entity_mentions_with_article_metadata(entity_mentions: list["EntityMention"], article: Article) -> list["EntityMention"]:
+        """ Enrich the extracted entity mentions with article metadata for downstream processing and analysis."""
+        for entity in entity_mentions:
+            entity.enrich_with_article_metadata(article)
+        return entity_mentions
+    
 
 def _call_llm(
     prompt: str,
@@ -131,7 +169,7 @@ def extract_entities(text: str, nlp) -> List[str]:
 
     return entities
 
-def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> dict[str:str]:
+def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> list[EntityMention]:
     """Extracts the sentiment for each entity mentioned in the article, alongside the count of these mentions.
     Each entry is a dictionary in the form {entity: [sentiment, count]}.
     If an entity is mentioned in a positive and negative light, two entries will be made.
@@ -163,12 +201,29 @@ def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> di
         If you are unsure, ignore this field as it is likely to be inaccurate."""
 
 
-    return get_LLM_response(prompt)
+    llm_response = get_LLM_response(prompt)
 
+    return extract_entity_mentions_from_llm_response(llm_response)
 
-def get_LLM_response(prompt: str) -> list:
-    """Send prompt to Gemini; return list of
-    serialised EntityAnalysis dicts.
+def extract_entity_mentions_from_llm_response(llm_response: list[dict]) -> list[EntityMention]:
+    """Convert LLM response to list of EntityMention objects."""
+    entity_mentions = []
+    for item in llm_response:
+        try:
+            entity_mention = EntityMention(
+                entity_name=item['entity_name'],
+                entity_type=item['entity_type'],
+                mention_count=item['mention_count'],
+                sentiment=item.get('sentiment', 'unknown')
+            )
+            entity_mentions.append(entity_mention)
+        except KeyError as e:
+            logging.warning(f"Missing expected field in LLM response item: {e}. Item: {item}")
+            continue
+    return entity_mentions
+
+def get_LLM_response(prompt: str) -> list[dict]:
+    """Send prompt to Gemini; return list of serialised EntityAnalysis dicts.
     """
     result = _call_llm(prompt, EntityResponse)
     if result is None:
