@@ -1,11 +1,3 @@
-# Data sources to reference existing AWS resources
-data "aws_vpc" "c22_vpc" {
-  filter {
-    name   = "tag:Name"
-    values = ["C22-VPC"]
-  }
-}
-
 data "aws_subnets" "c22_private" {
   filter {
     name   = "tag:Name"
