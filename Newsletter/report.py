@@ -4,6 +4,7 @@ Compatible for lambda function too"""
 
 import logging
 from pathlib import Path
+import pandas as pd
 import plotly.graph_objects as go
 
 from metrics import (
@@ -22,7 +23,7 @@ from metrics import (
 logging.basicConfig(level=logging.INFO)
 
 
-def format_metric_value(value, metric_type):
+def format_metric_value(value: float, metric_type: str) -> str:
     """Format metric values for display in the report."""
     if metric_type == "mention_volume":
         return str(int(value))
@@ -33,7 +34,7 @@ def format_metric_value(value, metric_type):
     return str(value)
 
 
-def build_metric_table(df, metric_column):
+def build_metric_table(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     """Simple df with company name and metric to include in report"""
 
     mapping = {
@@ -56,7 +57,7 @@ def build_metric_table(df, metric_column):
     return metric_table_df
 
 
-def build_sentiment_bar_chart(sentiment_df, title):
+def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
     """grouped bar chart for company sentiment distribution"""
 
     if sentiment_df.empty:
@@ -132,7 +133,7 @@ def build_sentiment_bar_chart(sentiment_df, title):
     """
 
 
-def dataframe_to_html_table(df, title, subheading):
+def dataframe_to_html_table(df: pd.DataFrame, title: str, subheading: str) -> str:
     """Convert a DataFrame into a styled HTML table."""
     if df.empty:
         return f"""
@@ -253,13 +254,13 @@ def build_html_report(
     return html
 
 
-def save_html_report(html_content, output_path):
+def save_html_report(html_content: str, output_path: str):
     """Save the HTML report to a file."""
     Path(output_path).write_text(html_content, encoding="utf-8")
     logging.info("Saved HTML report to %s", output_path)
 
 
-def generate_report_html(table_name, region_name):
+def generate_report_html(table_name: str, region_name: str) -> str:
     """Run the report pipeline and return the HTML string."""
     report_date = yesterday_date()
     logging.info("Generating HTML report for %s", report_date)

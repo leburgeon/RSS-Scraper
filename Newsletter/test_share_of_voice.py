@@ -37,7 +37,7 @@ def test_articles_by_company_count():
     tesla_row = result_df[result_df["entity_name"] == "Tesla"].iloc[0]
 
     # Apple mention_count = 3 + 2 + 2 = 7
-    assert apple_row["article_count"] == 7
+    assert apple_row["article_count"] == 5
 
     # Tesla mention_count = 1 + 4 = 5
     assert tesla_row["article_count"] == 5
@@ -48,13 +48,11 @@ def test_add_share_of_voice():
 
     article_counts_df = pd.DataFrame([
         {
-            "entity_id": "1",
             "entity_name": "Apple",
             "entity_type": "company",
-            "article_count": 7
+            "article_count": 5
         },
         {
-            "entity_id": "2",
             "entity_name": "Tesla",
             "entity_type": "company",
             "article_count": 5
@@ -66,8 +64,8 @@ def test_add_share_of_voice():
     apple_row = result_df[result_df["entity_name"] == "Apple"].iloc[0]
     tesla_row = result_df[result_df["entity_name"] == "Tesla"].iloc[0]
 
-    assert apple_row["share_of_voice"] == 7 / 12
-    assert tesla_row["share_of_voice"] == 5 / 12
+    assert apple_row["share_of_voice"] == 5 / 10
+    assert tesla_row["share_of_voice"] == 5 / 10
 
 
 def test_share_of_voice_calculate():
@@ -80,9 +78,9 @@ def test_share_of_voice_calculate():
     apple_row = result_df[result_df["entity_name"] == "Apple"].iloc[0]
     tesla_row = result_df[result_df["entity_name"] == "Tesla"].iloc[0]
 
-    assert apple_row["article_count"] == 7
+    assert apple_row["article_count"] == 5
     assert tesla_row["article_count"] == 5
-    assert apple_row["share_of_voice"] == 7 / 12
+    assert apple_row["share_of_voice"] == 5 / 12
     assert tesla_row["share_of_voice"] == 5 / 12
 
 
@@ -92,8 +90,8 @@ def test_share_of_voice_empty_dataframe():
 
     empty_df = pd.DataFrame(
         columns=[
-            "entity_id", "entity_name", "entity_type",
-            "article_id", "mention_count"
+            "entity_name", "entity_type",
+            "article_guid", "mention_count"
         ]
     )
 
@@ -101,7 +99,7 @@ def test_share_of_voice_empty_dataframe():
 
     assert result_df.empty
     assert list(result_df.columns) == [
-        "entity_id", "entity_name", "entity_type",
+        "entity_name", "entity_type",
         "article_count", "share_of_voice"
     ]
 

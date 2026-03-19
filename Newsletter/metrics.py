@@ -5,7 +5,7 @@ queries to get the relevant data for the newsletter report.
 
 1)Mention Volume:
 
-count(distinct article_id) where entity_id = X
+count(distinct article_guid) where entity_id = X
 
 2)Sentiment Distribution:
 For each company in date range:
@@ -18,12 +18,18 @@ For each company in date range:
 SOV= company article count/total articles
 """
 
+# article id can be replaced for article_guid
+# entity id is replaced for entity_name
+
+
+from botocore.exceptions import BotoCoreError, ClientError
 import logging
 from datetime import datetime, timedelta
 
 import boto3
 import pandas as pd
 from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError, BotoCoreError
 
 
 logging.basicConfig(level=logging.INFO)
@@ -35,38 +41,66 @@ def yesterday_date():
     return str(yesterday)
 
 
-def retrieve_dynamodb_table(table_name, region_name):
+def retrieve_dynamodb_table(table_name: str, region_name: str):
     """Connect to DynamoDB and return the table."""
-    logging.info("Connecting to DynamoDB table")
-    dynamodb = boto3.resource("dynamodb", region_name=region_name)
-    table = dynamodb.Table(table_name)
-    return table
+    try:
+        logging.info(
+            "Connecting to DynamoDB table: %s in region: %s",
+            table_name,
+            region_name
+        )
+
+        dynamodb = boto3.resource("dynamodb", region_name=region_name)
+        table = dynamodb.Table(table_name)
+
+        logging.info("Successfully connected to DynamoDB table")
+        return table
+
+    except ClientError as error:
+        logging.error(
+            "DynamoDB client error while connecting to table: %s", error)
+        raise
+
+    except BotoCoreError as error:
+        logging.error(
+            "Boto core error while connecting to DynamoDB: %s", error)
+        raise
 
 
-def mention_items_for_date(table, article_date):
+def mention_items_for_date(table, article_date: str) -> list:
     """Retrieve all mention items for one date."""
     logging.info("Retrieving mention items for %s", article_date)
 
     all_items = []
 
-    response = table.query(
-        KeyConditionExpression=Key("PK").eq(f"MENTION_DATE#{article_date}")
-    )
-    all_items.extend(response.get("Items", []))
-
-    while "LastEvaluatedKey" in response:
+    try:
         response = table.query(
-            KeyConditionExpression=Key("PK").eq(
-                f"MENTION_DATE#{article_date}"),
-            ExclusiveStartKey=response["LastEvaluatedKey"]
+            KeyConditionExpression=Key("PK").eq(f"MENTION_DATE#{article_date}")
         )
         all_items.extend(response.get("Items", []))
+
+        while "LastEvaluatedKey" in response:
+            response = table.query(
+                KeyConditionExpression=Key("PK").eq(
+                    f"MENTION_DATE#{article_date}"),
+                ExclusiveStartKey=response["LastEvaluatedKey"]
+            )
+            all_items.extend(response.get("Items", []))
+
+    except ClientError as error:
+        logging.error(
+            "DynamoDB client error retrieving mention items: %s", error)
+        raise
+
+    except BotoCoreError as error:
+        logging.error("Boto core error retrieving mention items: %s", error)
+        raise
 
     logging.info("Retrieved %s mention items", len(all_items))
     return all_items
 
 
-def mentions_dataframe_creation(items):
+def mentions_dataframe_creation(items: list) -> pd.DataFrame:
     """Convert retrieved items into a pandas DataFrame."""
     logging.info("Creating DataFrame")
     df = pd.DataFrame(items)
@@ -74,27 +108,23 @@ def mentions_dataframe_creation(items):
     return df
 
 
-def create_empty_dataframe(columns):
-    """Return an empty DataFrame with the given columns."""
-    return pd.DataFrame(columns=columns)
-
-
-def filter_company_rows(df, required_columns, log_message):
+def filter_company_rows(df: pd.DataFrame, required_columns: list, log_message: str) -> pd.DataFrame:
     """Keep only company rows with the required columns."""
     logging.info(log_message)
 
-    # and "people" is also a type of entity to be added rows
-    company_df = df[df["entity_type"] == "company"].copy()
+    # and "people" is also a type of entity to be added
+    company_df = df[(df["entity_type"] == "company") |
+                    (df["entity_type"] == "people")].copy()
 
     if company_df.empty:
-        return create_empty_dataframe(required_columns)
+        return pd.DataFrame(columns=required_columns)
 
     company_df = company_df[required_columns].dropna()
 
     return company_df
 
 
-def compute_mention_volume(df):
+def compute_mention_volume(df: pd.DataFrame) -> pd.DataFrame:
     """
     Compute mention volume for companies.
     Mention volume = number of distinct articles each company
@@ -102,26 +132,22 @@ def compute_mention_volume(df):
     """
     logging.info("Computing mention volume")
 
-    output_columns = ["entity_id", "entity_name",
+    output_columns = ["entity_name",
                       "entity_type", "mention_volume"]
 
-    required_columns = ["entity_id",
-                        "entity_name", "entity_type", "article_id"]
+    required_columns = ["entity_name", "entity_type", "article_guid"]
 
     company_df = filter_company_rows(
         df, required_columns, "Filtering company rows for mention volume")
 
     if company_df.empty:
-        return create_empty_dataframe(output_columns)
-
-    # duplicates may not need to be removed if already cleaned
-    company_df = company_df.drop_duplicates(subset=["entity_id", "article_id"])
+        return pd.DataFrame(columns=output_columns)
 
     mention_volume_df = (
-        company_df.groupby(["entity_id", "entity_name", "entity_type"],
+        company_df.groupby(["entity_name", "entity_type"],
                            as_index=False
                            )
-        .agg(mention_volume=("article_id", "count"))
+        .agg(mention_volume=("article_guid", "count"))
         .sort_values(by="mention_volume", ascending=False)
         .reset_index(drop=True)
     )
@@ -131,28 +157,27 @@ def compute_mention_volume(df):
     return mention_volume_df
 
 
-def filter_company_sentiment_rows(df):
+def filter_company_sentiment_rows(df: pd.DataFrame) -> pd.DataFrame:
     """Keep only company rows with the columns needed for sentiment analysis."""
-    required_columns = ["entity_id", "entity_name", "entity_type", "sentiment"]
+    required_columns = ["entity_name", "entity_type", "sentiment"]
 
     return filter_company_rows(df, required_columns, "Filtering company sentiment rows")
 
 
-def count_sentiment_by_company(company_df):
+def count_sentiment_by_company(company_df: pd.DataFrame) -> pd.DataFrame:
     """Count positive, neutral, and negative rows for each company."""
 
     logging.info("Counting sentiment by company")
 
-    output_columns = [
-        "entity_id", "entity_name", "entity_type",
-        "positive", "neutral", "negative"]
+    output_columns = ["entity_name", "entity_type",
+                      "positive", "neutral", "negative"]
 
     if company_df.empty:
-        return create_empty_dataframe(output_columns)
+        return pd.DataFrame(columns=output_columns)
 
     sentiment_counts_df = (
         company_df.groupby(
-            ["entity_id", "entity_name", "entity_type", "sentiment"]
+            ["entity_name", "entity_type", "sentiment"]
         )
         .size()
         # unstack may not be needed as data will be cleaned
@@ -171,18 +196,17 @@ def count_sentiment_by_company(company_df):
     return sentiment_counts_df
 
 
-def sentiment_percentages(sentiment_counts_df):
+def sentiment_percentages(sentiment_counts_df: pd.DataFrame) -> pd.DataFrame:
     """Add total, positive_pct, neutral_pct, and negative_pct columns."""
     logging.info("Adding sentiment percentages")
 
-    output_columns = [
-        "entity_id", "entity_name", "entity_type",
-        "positive", "neutral", "negative",
-        "total", "positive_pct", "neutral_pct", "negative_pct"
-    ]
+    output_columns = ["entity_name", "entity_type",
+                      "positive", "neutral", "negative",
+                      "total", "positive_pct", "neutral_pct", "negative_pct"
+                      ]
 
     if sentiment_counts_df.empty:
-        return create_empty_dataframe(output_columns)
+        return pd.DataFrame(columns=output_columns)
 
     sentiment_counts_df["total"] = (
         sentiment_counts_df["positive"]
@@ -215,23 +239,22 @@ def sentiment_percentages(sentiment_counts_df):
     return sentiment_counts_df
 
 
-def sentiment_distribution_calculate(df):
+def sentiment_distribution_calculate(df: pd.DataFrame) -> pd.DataFrame:
     """Compute sentiment counts and percentages for each company.
     - positive_pct for top 3 positive sentiment
     - negative_pct for top 3 negative sentiment"""
 
     logging.info("Computing sentiment distribution")
 
-    output_columns = [
-        "entity_id", "entity_name", "entity_type",
-        "positive", "neutral", "negative",
-        "total", "positive_pct", "neutral_pct", "negative_pct"
-    ]
+    output_columns = ["entity_name", "entity_type",
+                      "positive", "neutral", "negative",
+                      "total", "positive_pct", "neutral_pct", "negative_pct"
+                      ]
 
     company_df = filter_company_sentiment_rows(df)
 
     if company_df.empty:
-        return create_empty_dataframe(output_columns)
+        return pd.DataFrame(columns=output_columns)
 
     sentiment_counts_df = count_sentiment_by_company(company_df)
     sentiment_distribution_df = sentiment_percentages(sentiment_counts_df)
@@ -244,30 +267,29 @@ def sentiment_distribution_calculate(df):
     return sentiment_distribution_df
 
 
-def filter_company_article_rows(df):
+def filter_company_article_rows(df: pd.DataFrame) -> pd.DataFrame:
     """Keep only company rows and the columns needed for share of voice."""
 
-    required_columns = ["entity_id", "entity_name",
-                        "entity_type", "article_id", "mention_count"]
+    required_columns = ["entity_name", "entity_type",
+                        "article_guid", "mention_count"]
 
     return filter_company_rows(df, required_columns, "Filtering company rows for share of voice")
 
 
-def articles_by_company_count(company_df):
+def articles_by_company_count(company_df: pd.DataFrame) -> pd.DataFrame:
     """Summing total mentions across all articles for each company 
     to get article count for share of voice calculation."""
 
     logging.info("Counting total mentions by company")
 
-    output_columns = ["entity_id", "entity_name",
-                      "entity_type", "article_count"]
+    output_columns = ["entity_name", "entity_type", "article_count"]
 
     if company_df.empty:
-        return create_empty_dataframe(output_columns)
+        return pd.DataFrame(columns=output_columns)
 
     article_counts_df = (
         company_df.groupby(
-            ["entity_id", "entity_name", "entity_type"],
+            ["entity_name", "entity_type"],
             as_index=False
         )
         .agg(article_count=("mention_count", "sum"))
@@ -276,18 +298,18 @@ def articles_by_company_count(company_df):
     return article_counts_df
 
 
-def add_share_of_voice(article_counts_df):
+def add_share_of_voice(article_counts_df: pd.DataFrame) -> pd.DataFrame:
     """share_of_voice function to compute total mentions across all articles
     as companies can be mentioned multiple times in same article"""
     logging.info("Adding share of voice")
 
     output_columns = [
-        "entity_id", "entity_name", "entity_type",
+        "entity_name", "entity_type",
         "article_count", "share_of_voice"
     ]
 
     if article_counts_df.empty:
-        return create_empty_dataframe(output_columns)
+        return pd.DataFrame(columns=output_columns)
 
     total_article_mentions = article_counts_df["article_count"].sum()
 
@@ -301,7 +323,7 @@ def add_share_of_voice(article_counts_df):
     return article_counts_df
 
 
-def share_of_voice_calculate(df):
+def share_of_voice_calculate(df: pd.DataFrame) -> pd.DataFrame:
     """
     Compute share of voice for each company.
     share_of_voice =
@@ -310,14 +332,14 @@ def share_of_voice_calculate(df):
     logging.info("Computing share of voice")
 
     output_columns = [
-        "entity_id", "entity_name", "entity_type",
+        "entity_name", "entity_type",
         "article_count", "share_of_voice"
     ]
 
     company_df = filter_company_article_rows(df)
 
     if company_df.empty:
-        return create_empty_dataframe(output_columns)
+        return pd.DataFrame(columns=output_columns)
 
     article_counts_df = articles_by_company_count(company_df)
     share_of_voice_df = add_share_of_voice(article_counts_df)
@@ -332,7 +354,7 @@ def share_of_voice_calculate(df):
     return share_of_voice_df
 
 
-def top_3_rows(df, metric_column):
+def top_3_rows(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     """Return top 3 rows by the chosen metric column."""
     if df.empty:
         return df.copy()
@@ -341,7 +363,7 @@ def top_3_rows(df, metric_column):
     return top_3_df
 
 
-def bottom_3_rows(df, metric_column):
+def bottom_3_rows(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     """Return bottom 3 rows by the chosen metric column, excluding zero."""
     if df.empty:
         return df.copy()

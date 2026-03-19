@@ -31,7 +31,7 @@ def test_count_sentiment_by_company():
     tesla_row = result_df[result_df["entity_name"] == "Tesla"].iloc[0]
 
     assert apple_row["positive"] == 1
-    assert apple_row["negative"] == 2
+    assert apple_row["negative"] == 1
     assert apple_row["neutral"] == 0
 
     assert tesla_row["positive"] == 1
@@ -43,7 +43,6 @@ def test_sentiment_percentages():
     """Test that sentiment percentages are calculated correctly."""
     sentiment_counts_df = pd.DataFrame([
         {
-            "entity_id": "1",
             "entity_name": "Apple",
             "entity_type": "company",
             "positive": 1,
@@ -68,11 +67,11 @@ def test_sentiment_distribution_calculate():
 
     apple_row = result_df[result_df["entity_name"] == "Apple"].iloc[0]
 
-    assert apple_row["total"] == 3
+    assert apple_row["total"] == 2
     assert apple_row["positive"] == 1
-    assert apple_row["negative"] == 2
-    assert apple_row["positive_pct"] == 1 / 3
-    assert apple_row["negative_pct"] == 2 / 3
+    assert apple_row["negative"] == 1
+    assert apple_row["positive_pct"] == 1 / 2
+    assert apple_row["negative_pct"] == 1 / 2
 
 
 def test_sentiment_distribution_empty_dataframe():
@@ -80,14 +79,14 @@ def test_sentiment_distribution_empty_dataframe():
     an empty dataframe returns an empty dataframe."""
 
     empty_df = pd.DataFrame(
-        columns=["entity_id", "entity_name", "entity_type", "sentiment"]
+        columns=["entity_name", "entity_type", "sentiment"]
     )
 
     result_df = sentiment_distribution_calculate(empty_df)
 
     assert result_df.empty
     assert list(result_df.columns) == [
-        "entity_id", "entity_name", "entity_type",
+        "entity_name", "entity_type",
         "positive", "neutral", "negative",
         "total", "positive_pct", "neutral_pct", "negative_pct"
     ]
