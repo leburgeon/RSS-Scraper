@@ -1,5 +1,5 @@
 import pytest
-from RSS_pipeline.entity_extraction_utils import extract_entities
+from RSS_pipeline.utils.transform_utils import extract_entities
 
 
 class TestTechEntityExtraction:

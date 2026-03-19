@@ -1,6 +1,6 @@
 import pytest
 
-from RSS_pipeline.polling_utils import filter_articles_by_date
+from RSS_pipeline.utils.extract_utils import filter_articles_by_date
 
 def test_filter_articles_by_date():
     """Tests filtering articles by publish date."""

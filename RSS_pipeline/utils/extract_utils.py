@@ -10,10 +10,17 @@ import hashlib
 logging.basicConfig(level=logging.INFO)
 
 
+def extract_latest_article_date_from_db(table_name) -> str:
+    """Query the database to get the most recent article date for the feed."""
+    # This is a placeholder implementation. You would replace this with your actual database query logic.
+    
+    
+
+
 class Article:
-    def __init__(self, pk: str, article_guid: str, title: str, published_at: datetime):
-        self.pk = pk
-        self.sk = "meta"
+    def __init__(self, article_guid: str, title: str, published_at: datetime):
+        self.pk = Article._generate_pk_for_article(article_guid)
+        self.sk = "META"
         self.article_guid = article_guid
         self.title = title
         self.published_at = published_at
@@ -25,10 +32,12 @@ class Article:
             "sk": self.sk,
             "article_guid": self.article_guid,
             "title": self.title,
-            "article_content": self.article_content,
-            "published_at": self.published_at.isoformat()
+            "published_at": self.published_at.isoformat(),
+            "article_content": self.article_content
+            
         }
     
+    @staticmethod
     def _get_html_content_from_article_link(article_link) -> str:
         """Fetch the HTML content of the article from its link."""
         try:
@@ -40,6 +49,7 @@ class Article:
                 f"Error fetching article content from {article_link}: {e}")
             return None
         
+    @staticmethod
     def _extract_article_content(article_link) -> str:
         """Extract the main content of an article from its article link."""
         try:
@@ -53,6 +63,11 @@ class Article:
             logging.error(f"Error extracting article content: {e}")
             return None
 
+    @staticmethod
+    def _generate_pk_for_article(article_guid) -> str:
+        """Generate a unique primary key for the article using its GUID."""
+        return f"ARTICLE#{article_guid}"
+
 
 def poll_rss_feed_for_articles(feed_url) -> list[Article]:
     """
@@ -65,8 +80,7 @@ def poll_rss_feed_for_articles(feed_url) -> list[Article]:
 
     for entry in feed.entries:
         
-        articles.append(Article(        
-            pk=entry.get('id'),
+        articles.append(Article(
             article_guid=entry.get('id'),
             title=entry.get('title'),
             published_at=datetime.strptime(entry.get('published'), '%a, %d %b %Y %H:%M:%S %Z')
@@ -75,8 +89,20 @@ def poll_rss_feed_for_articles(feed_url) -> list[Article]:
     return articles
 
 
-def filter_articles_by_date(articles: list[Article], most_recent_date: str) -> list[Article]:
-    """Filter out articles that are before a certain date"""
+def filter_articles_by_date(
+    articles: list[Article],
+    most_recent_date: str
+) -> list[Article]:
+    """Filter articles published strictly after most_recent_date.
+    Expects most_recent_date as an ISO 8601 string.
+    Articles with unparseable dates are excluded.
+    """
+    cutoff = datetime.fromisoformat(most_recent_date)
+    filtered = []
+    for article in articles:
+        if article.published_at > cutoff:
+            filtered.append(article)
+    return filtered
 
 
 
