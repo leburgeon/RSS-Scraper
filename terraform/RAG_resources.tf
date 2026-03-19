@@ -91,7 +91,7 @@ resource "aws_db_subnet_group" "rag_db_subnet_group" {
 # Random password for RDS master user
 resource "random_password" "rds_master_password" {
   length  = 32
-  special = true
+  special = false
 }
 
 # Store password in Secrets Manager
