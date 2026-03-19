@@ -9,6 +9,8 @@ from google.genai import types
 import logging
 from pydantic import BaseModel
 from typing import List, Literal
+import spacy
+from spacy.util import compile_suffix_regex
 
 load_dotenv()
 
@@ -22,7 +24,7 @@ class EntityAnalysis(BaseModel):
     """Schema for a single entity sentiment."""
     entity_name: str
     entity_type: Literal[
-        "company", "person", "unknown"
+        "company", "person"
     ]
     mention_count: int
     sentiment: Literal[
@@ -60,28 +62,74 @@ def _call_llm(
     return response.parsed
 
 
-def extract_entities(text: str) -> List[str]:
+def setup_nlp() -> spacy.language.Language:
+
+    nlp = spacy.load("en_core_web_sm")
+
+    # Add stricter suffix rules to prevent splitting entities like "spaceX." into "spaceX"
+    suffixes = nlp.Defaults.suffixes + [r'\.$']
+    suffix_re = compile_suffix_regex(suffixes)
+    nlp.tokenizer.suffix_search = suffix_re.search
+
+    # definitive company mentions.
+    tech_companies = [
+        "SpaceX", "Tesla", "OpenAI", "Anthropic",
+        "Microsoft", "Nvidia", "Google", "Apple"
+    ]
+
+    if "entity_ruler" not in nlp.pipe_names:
+        ruler = nlp.add_pipe("entity_ruler", before="ner")
+
+        # Build patterns: we want these to be tagged as 'ORG'
+        patterns = [{"label": "ORG", "pattern": name}
+                    for name in tech_companies]
+        ruler.add_patterns(patterns)
+
+        patterns = [{"label": "ORG", "pattern": [{"LOWER": name.lower()}]}
+                    for name in tech_companies]
+        
+        ruler.add_patterns(patterns)
+
+    return nlp
+
+
+
+
+def extract_entities(text: str, nlp) -> List[str]:
     """
-    Extract named entities (people, orgs)
-    from text using the LLM.
-    Preserves duplicate mentions.
-    Returns empty list for empty input.
+    Extract named entities from the given text using spaCy.
+
+    Returns a list of entity strings in order of appearance. Captures
+    common named-entity labels such as PERSON and ORG. Duplicates
+    (multiple mentions) are preserved.
     """
+    
     if not text:
         return []
 
-    prompt = (
-        f"Extract all named entities (people, "
-        f"organisations, and notable products) "
-        f"from the following text. "
-        f"Preserve duplicates for each mention. "
-        f"Return only a JSON list of name strings."
-        f"\n\nText: {text}"
-    )
-    result = _call_llm(prompt, EntityNamesResponse)
-    if result is None:
-        return []
-    return result.entities
+    doc = nlp(text)
+
+    # print(f"\n--- Debugging: '{text}' ---")
+    # for token in doc:
+    #     print(
+    #         f"Token: {token.text:10} | Tag: {token.tag_:4} | Ent: {token.ent_type_}")
+    # print("-----------------------------\n")
+
+    target_labels = {"ORG", "PRODUCT"}
+
+    entities = []
+    
+    for ent in doc.ents:
+        if ent.label_ in target_labels:
+
+            nnp_parts = [token.text for token in ent if token.tag_ == "NNP"]
+
+            clean_name = " ".join(nnp_parts).strip().rstrip('.,')
+
+            if clean_name and len(clean_name) > 3 and clean_name[0].isupper():
+                entities.append(clean_name)
+
+    return entities
 
 def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> dict[str:str]:
     """Extracts the sentiment for each entity mentioned in the article, alongside the count of these mentions.
@@ -111,8 +159,7 @@ def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> di
         "entity_type": "company",
         "mention_count": 5
         "sentiment": "positive"}}.
-        The entity_type should be either 'company or 'person'. If you are unsure, ignore this field
-        as it is likely to be inaccurate. The sentiment should be either 'positive', 'negative' or 'neutral'.
+        The sentiment should be either 'positive', 'negative' or 'neutral'.
         If you are unsure, ignore this field as it is likely to be inaccurate."""
 
 

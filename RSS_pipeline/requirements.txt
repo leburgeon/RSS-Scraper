@@ -5,6 +5,7 @@ beautifulsoup4
 python-dotenv
 google-genai
 pydantic
+spaCy
 # After installing, run:
 # pip install google-genai
 
