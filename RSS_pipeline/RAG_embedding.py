@@ -12,8 +12,8 @@ load_dotenv()
 def embed_chunk_via_openai(chunk: str) -> list[float]:
     """Embed a chunk of text using OpenAI's embedding API."""
 
-    if not isinstance(chunk, str) or not chunk.strip():
-        raise ValueError("chunk must be a non-empty string")
+    if not isinstance(chunk, str):
+        raise ValueError("chunk must be a string")
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -26,3 +26,4 @@ def embed_chunk_via_openai(chunk: str) -> list[float]:
     )
 
     return response.data[0].embedding
+
