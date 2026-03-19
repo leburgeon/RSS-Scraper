@@ -1,3 +1,4 @@
+# Configures Terraform, required providers, and the S3 backend for remote state
 terraform {
   required_providers {
     aws = {
@@ -14,6 +15,26 @@ terraform {
   }
 }
 
+# Configures the AWS provider and default region
 provider "aws" {
   region = "eu-west-2"
+}
+
+# Fetches the current AWS region dynamically for use in other resources
+data "aws_region" "current" {}
+
+# Fetches the existing VPC using its Name tag
+data "aws_vpc" "c22_vpc" {
+  filter {
+    name   = "tag:Name"
+    values = ["c22-VPC"]
+  }
+}
+
+# Fetches existing public subnets in the VPC using their Name tags
+data "aws_subnets" "public_subnets" {
+  filter {
+    name   = "tag:Name"
+    values = ["c22-public-subnet-*"]
+  }
 }
