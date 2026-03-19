@@ -1,41 +1,28 @@
 """This script will be used to define the metrics for the newsletter report,
+including mention volume, sentiment distribution, and share of voice."""
 
-These will accquired by connecting to dynamoDB and running
-queries to get the relevant data for the newsletter report.
-
-1)Mention Volume:
-
-count(distinct article_guid) where entity_id = X
-
-2)Sentiment Distribution:
-For each company in date range:
-
-(pos/neu/neg mention)/articles
-
-3)Share of Voice:
-For each company in date range:
-
-SOV= company article count/total articles
-"""
-
-# article id can be replaced for article_guid
-# entity id is replaced for entity_name
-
+import logging
+from datetime import datetime, timedelta
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import BotoCoreError, ClientError
-import logging
 import pandas as pd
-from datetime import date, datetime, timedelta
 
 
 logging.basicConfig(level=logging.INFO)
 
 
-def yesterday_date():
-    """Return yesterday's date as YYYY-MM-DD."""
-    yesterday = datetime.utcnow().date()
-    return str(yesterday)
+def recent_dates(number_of_days: int) -> list:
+    """Return a list of recent dates as YYYY-MM-DD strings."""
+    today = datetime.utcnow().date()
+    date_list = []
+
+    for day_offset in range(number_of_days):
+        current_date = today - timedelta(days=day_offset)
+        date_list.append(str(current_date))
+
+    date_list.sort()
+    return date_list
 
 
 def retrieve_dynamodb_table(table_name: str, region_name: str):
@@ -97,6 +84,20 @@ def mention_items_for_date(table, article_date: str) -> list:
     return all_items
 
 
+def mention_items_for_dates(table, article_dates: list) -> list:
+    """Retrieve all mention items for multiple dates."""
+    logging.info("Retrieving mention items for %s dates", len(article_dates))
+
+    all_items = []
+
+    for article_date in article_dates:
+        date_items = mention_items_for_date(table, article_date)
+        all_items.extend(date_items)
+
+    logging.info("Retrieved %s mention items across all dates", len(all_items))
+    return all_items
+
+
 def mentions_dataframe_creation(items: list) -> pd.DataFrame:
     """Convert retrieved items into a pandas DataFrame."""
     logging.info("Creating DataFrame")
@@ -109,8 +110,9 @@ def filter_company_rows(df: pd.DataFrame, required_columns: list, log_message: s
     """Keep only company rows with the required columns."""
     logging.info(log_message)
 
-    # and "people" is also a type of entity to be added
-    company_df = df[(df["entity_type"] == "company")].copy()
+    company_df = df[
+        (df["entity_type"] == "company") & ~df["entity_name"].
+        isin(["TechCrunch", "Guardian"])].copy()
 
     if company_df.empty:
         return pd.DataFrame(columns=required_columns)
@@ -171,6 +173,11 @@ def count_sentiment_by_company(company_df: pd.DataFrame) -> pd.DataFrame:
     if company_df.empty:
         return pd.DataFrame(columns=output_columns)
 
+    known_sentiments = ["positive", "neutral", "negative"]
+    company_df = company_df[
+        company_df["sentiment"].isin(known_sentiments)
+    ].copy()
+
     sentiment_counts_df = (
         company_df.groupby(
             ["entity_name", "entity_type", "sentiment"]
@@ -192,68 +199,22 @@ def count_sentiment_by_company(company_df: pd.DataFrame) -> pd.DataFrame:
     return sentiment_counts_df
 
 
-def sentiment_percentages(sentiment_counts_df: pd.DataFrame) -> pd.DataFrame:
-    """Add total, positive_pct, neutral_pct, and negative_pct columns."""
-    logging.info("Adding sentiment percentages")
-
-    output_columns = ["entity_name", "entity_type",
-                      "positive", "neutral", "negative",
-                      "total", "positive_pct", "neutral_pct", "negative_pct"
-                      ]
-
-    if sentiment_counts_df.empty:
-        return pd.DataFrame(columns=output_columns)
-
-    sentiment_counts_df["total"] = (
-        sentiment_counts_df["positive"]
-        + sentiment_counts_df["neutral"]
-        + sentiment_counts_df["negative"]
-    )
-
-    sentiment_counts_df["positive_pct"] = 0.0
-    sentiment_counts_df["neutral_pct"] = 0.0
-    sentiment_counts_df["negative_pct"] = 0.0
-
-    # none zero mask to avoid division by zero
-    non_zero = sentiment_counts_df["total"] > 0
-
-    sentiment_counts_df.loc[non_zero, "positive_pct"] = (
-        sentiment_counts_df.loc[non_zero, "positive"]
-        / sentiment_counts_df.loc[non_zero, "total"]
-    )
-
-    sentiment_counts_df.loc[non_zero, "neutral_pct"] = (
-        sentiment_counts_df.loc[non_zero, "neutral"]
-        / sentiment_counts_df.loc[non_zero, "total"]
-    )
-
-    sentiment_counts_df.loc[non_zero, "negative_pct"] = (
-        sentiment_counts_df.loc[non_zero, "negative"]
-        / sentiment_counts_df.loc[non_zero, "total"]
-    )
-
-    return sentiment_counts_df
-
-
 def sentiment_distribution_calculate(df: pd.DataFrame) -> pd.DataFrame:
     """Compute sentiment counts and percentages for each company.
-    - positive_pct for top 3 positive sentiment
-    - negative_pct for top 3 negative sentiment"""
+    - positive count for top 3 positive sentiment
+    - negative count for top 3 negative sentiment"""
 
     logging.info("Computing sentiment distribution")
 
     output_columns = ["entity_name", "entity_type",
-                      "positive", "neutral", "negative",
-                      "total", "positive_pct", "neutral_pct", "negative_pct"
-                      ]
+                      "positive", "neutral", "negative"]
 
     company_df = filter_company_sentiment_rows(df)
 
     if company_df.empty:
         return pd.DataFrame(columns=output_columns)
 
-    sentiment_counts_df = count_sentiment_by_company(company_df)
-    sentiment_distribution_df = sentiment_percentages(sentiment_counts_df)
+    sentiment_distribution_df = count_sentiment_by_company(company_df)
     sentiment_distribution_df = sentiment_distribution_df.reset_index(
         drop=True)
 
@@ -374,117 +335,20 @@ def bottom_3_rows(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     return bottom_3_df
 
 
-def main():
-    """Main function to run the metrics calculations and print results."""
-
-    table_name = "c22-rss-scraper-table"
-    region_name = "eu-west-2"
-
-    article_date = yesterday_date()
-
-    table = retrieve_dynamodb_table(table_name, region_name)
-    items = mention_items_for_date(table, article_date)
-
-    if not items:
-        logging.info("No mention items found for yesterday")
-        return
-
-    df = mentions_dataframe_creation(items)
-
-    mention_volume_df = compute_mention_volume(df)
-    sentiment_distribution_df = sentiment_distribution_calculate(df)
-    share_of_voice_df = share_of_voice_calculate(df)
-
-    top_3_companies = top_3_rows(mention_volume_df, "mention_volume")
-    bottom_3_companies = bottom_3_rows(mention_volume_df, "mention_volume")
-
-    top_3_sentiment_companies = top_3_rows(
-        sentiment_distribution_df,
-        "positive_pct"
-    )
-
-    bottom_3_sentiment_companies = top_3_rows(
-        sentiment_distribution_df,
-        "negative_pct"
-    )
-
-    top_3_share_of_voice_companies = top_3_rows(
-        share_of_voice_df,
-        "share_of_voice"
-    )
-
-    bottom_3_share_of_voice_companies = bottom_3_rows(
-        share_of_voice_df,
-        "share_of_voice"
-    )
-
-    print("\nTop 3 Companies by Mention Volume")
-    print(top_3_companies)
-
-    print("\nBottom 3 Companies by Mention Volume")
-    print(bottom_3_companies)
-
-    print("\nTop 3 Companies by Positive Sentiment Percentage")
-    print(top_3_sentiment_companies)
-
-    print("\nTop 3 Companies by Negative Sentiment Percentage")
-    print(bottom_3_sentiment_companies)
-
-    print("\nTop 3 Companies by Share of Voice")
-    print(top_3_share_of_voice_companies)
-
-    print("\nBottom 3 Companies by Share of Voice")
-    print(bottom_3_share_of_voice_companies)
-
-
-if __name__ == "__main__":
-    main()
-
-    # retrieve_dynamodb_table("c22-rss-scraper-table", "eu-west-2")
-    # mention_items_for_date(table=retrieve_dynamodb_table(
-    #     "c22-rss-scraper-table", "eu-west-2"), article_date=date.today().strftime("%Y-%m-%d"))
-
-
-# logging.basicConfig(level=logging.INFO)
-
-
-# def retrieve_dynamodb_table(table_name, region_name):
-#     """Connect to DynamoDB and return the table."""
-#     logging.info("Connecting to DynamoDB table: %s", table_name)
-#     dynamodb = boto3.resource("dynamodb", region_name=region_name)
-#     table = dynamodb.Table(table_name)
-#     return table
-
-
-# def test_dynamodb_connection(table_name, region_name):
-#     """Check that DynamoDB table connection works."""
-#     try:
-#         table = retrieve_dynamodb_table(table_name, region_name)
-
-#         # This makes a real request to AWS and confirms the table exists
-#         table.load()
-
-#         logging.info(
-#             "Successfully connected to DynamoDB table: %s", table_name)
-#         logging.info("Table status: %s", table.table_status)
-#         return True
-
-#     except (ClientError, BotoCoreError) as error:
-#         logging.error(
-#             "Failed to connect to DynamoDB table %s: %s", table_name, error)
-#         return False
-
-
 # def main():
+#     """Main function to run the metrics calculations and print results."""
+
 #     table_name = "c22-rss-scraper-table"
 #     region_name = "eu-west-2"
 
-#     success = test_dynamodb_connection(table_name, region_name)
+#     article_dates = recent_dates(2)
 
-#     if success:
-#         print("DynamoDB connection successful")
-#     else:
-#         print("DynamoDB connection failed")
+#     table = retrieve_dynamodb_table(table_name, region_name)
+#     items = mention_items_for_dates(table, article_dates)
+
+#     if not items:
+#         logging.info("No mention items found for the selected date range")
+#         return
 
 
 # if __name__ == "__main__":

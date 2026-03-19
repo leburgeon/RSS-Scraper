@@ -8,17 +8,16 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from metrics import (
-    yesterday_date,
+    recent_dates,
     retrieve_dynamodb_table,
     mentions_dataframe_creation,
     compute_mention_volume,
     sentiment_distribution_calculate,
     share_of_voice_calculate,
-    mention_items_for_date,
+    mention_items_for_dates,
     top_3_rows,
     bottom_3_rows,
 )
-
 
 logging.basicConfig(level=logging.INFO)
 
@@ -57,8 +56,11 @@ def build_metric_table(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     return metric_table_df
 
 
-def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
-    """grouped bar chart for company sentiment distribution"""
+def build_sentiment_bar_chart(
+        sentiment_df: pd.DataFrame,
+        title: str,
+        include_plotlyjs: str = "cdn",) -> str:
+    """Grouped bar chart for company sentiment counts."""
 
     if sentiment_df.empty:
         return f"""
@@ -69,9 +71,9 @@ def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
         """
 
     company_names = sentiment_df["entity_name"].tolist()
-    positive_values = (sentiment_df["positive_pct"] * 100).round(2).tolist()
-    neutral_values = (sentiment_df["neutral_pct"] * 100).round(2).tolist()
-    negative_values = (sentiment_df["negative_pct"] * 100).round(2).tolist()
+    positive_values = sentiment_df["positive"].tolist()
+    neutral_values = sentiment_df["neutral"].tolist()
+    negative_values = sentiment_df["negative"].tolist()
 
     fig = go.Figure()
 
@@ -80,7 +82,7 @@ def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
             name="Positive",
             x=company_names,
             y=positive_values,
-            text=[f"{value}%" for value in positive_values],
+            text=positive_values,
             textposition="outside",
             marker_color="limegreen"
         )
@@ -91,7 +93,7 @@ def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
             name="Neutral",
             x=company_names,
             y=neutral_values,
-            text=[f"{value}%" for value in neutral_values],
+            text=neutral_values,
             textposition="outside",
             marker_color="blue"
         )
@@ -102,18 +104,26 @@ def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
             name="Negative",
             x=company_names,
             y=negative_values,
-            text=[f"{value}%" for value in negative_values],
+            text=negative_values,
             textposition="outside",
             marker_color="red"
         )
     )
 
+    for index in range(len(company_names) - 1):
+        fig.add_vline(
+            x=index + 0.5,
+            line_width=1,
+            line_dash="dash",
+            line_color="gray",
+            opacity=0.6
+        )
+
     fig.update_layout(
         barmode="group",
         title=title,
         xaxis_title="Company Name",
-        yaxis_title="Sentiment Percentage",
-        yaxis={"range": [0, 100]},
+        yaxis_title="Sentiment Count",
         margin={"l": 40, "r": 20, "t": 60, "b": 40},
         height=450,
         template="plotly_white",
@@ -121,9 +131,8 @@ def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
     )
 
     chart_html = fig.to_html(
-        full_html=False,  # Only return the div for the chart, not a full HTML document
-        # Use the CDN version of Plotly.js to reduce the size of the HTML
-        include_plotlyjs="cdn",
+        full_html=False,
+        include_plotlyjs=include_plotlyjs,
         config={"displayModeBar": False},
     )
 
@@ -233,10 +242,10 @@ def build_html_report(
             </section>
 
             {dataframe_to_html_table(top_mention_volume_table, "Mention Volume",
-                                     subheading="Companies appearing in the most unique articles yesterday")}
+                                     subheading="Companies appearing in the most unique articles in this date range")}
 
             {dataframe_to_html_table(top_share_of_voice_table, "Share of Voice",
-                                         subheading="Companies most discussed across all mentions yesterday")}
+                                         subheading="Companies most discussed across all mentions in this date range")}
             {top_sentiment_chart_html}
 
             <section class="card full-width">
@@ -244,9 +253,9 @@ def build_html_report(
             </section>
 
             {dataframe_to_html_table(bottom_mention_volume_table, "Mention Volume",
-                                             subheading="Companies appearing in the fewest unique articles yesterday")}
+                                             subheading="Companies appearing in the fewest unique articles in this date range")}
             {dataframe_to_html_table(bottom_share_of_voice_table, "Share of Voice",
-                                                 subheading="Companies least discussed across all mentions yesterday")}
+                                                 subheading="Companies least discussed across all mentions in this date range")}
             {bottom_sentiment_chart_html}
         </div>
     </body>
@@ -263,20 +272,21 @@ def save_html_report(html_content: str, output_path: str):
 
 def generate_report_html(table_name: str, region_name: str) -> str:
     """Run the report pipeline and return the HTML string."""
-    report_date = yesterday_date()
+    article_dates = recent_dates(2)
+    report_date = f"{article_dates[0]} to {article_dates[-1]}"
     logging.info("Generating HTML report for %s", report_date)
 
     table = retrieve_dynamodb_table(table_name, region_name)
-    items = mention_items_for_date(table, report_date)
+    items = mention_items_for_dates(table, article_dates)
 
     if not items:
-        logging.info("No mention items found for yesterday")
+        logging.info("No mention items found for the selected date range")
         return f"""
         <html>
             <body>
                 <h1>Daily Media Report</h1>
                 <p>Report date: {report_date}</p>
-                <p>No data available for this date.</p>
+                <p>No data available for this date range.</p>
             </body>
         </html>
         """
@@ -287,19 +297,21 @@ def generate_report_html(table_name: str, region_name: str) -> str:
     sentiment_distribution_df = sentiment_distribution_calculate(df)
     share_of_voice_df = share_of_voice_calculate(df)
     top_mention_volume_df = top_3_rows(mention_volume_df, "mention_volume")
+
     bottom_mention_volume_df = bottom_3_rows(
-        mention_volume_df, "mention_volume")
+        mention_volume_df[mention_volume_df["mention_volume"] >= 5], "mention_volume")
+    # filter mention volume for bottom companies to those with at least 5 mentions to avoid outliers
 
     top_sentiment_df = top_3_rows(
-        sentiment_distribution_df, "positive_pct")
+        sentiment_distribution_df, "positive")
     bottom_sentiment_df = top_3_rows(
-        sentiment_distribution_df, "negative_pct")
+        sentiment_distribution_df, "negative")
 
     top_share_of_voice_df = top_3_rows(
         share_of_voice_df, "share_of_voice")
 
     bottom_share_of_voice_df = bottom_3_rows(
-        share_of_voice_df, "share_of_voice")
+        share_of_voice_df[share_of_voice_df["share_of_voice"] >= 0.02], "share_of_voice")
 
     top_mention_volume_table = build_metric_table(
         top_mention_volume_df, "mention_volume")
@@ -314,10 +326,13 @@ def generate_report_html(table_name: str, region_name: str) -> str:
         bottom_share_of_voice_df, "share_of_voice")
 
     top_sentiment_chart_html = build_sentiment_bar_chart(
-        top_sentiment_df, "Companies most positively talked about yesterday")
+        top_sentiment_df, f"Companies most positively talked about in date range {report_date}")
 
     bottom_sentiment_chart_html = build_sentiment_bar_chart(
-        bottom_sentiment_df, "Companies most negatively talked about companies yesterday")
+        bottom_sentiment_df,
+        f"Companies most negatively talked about companies in date range {report_date}",
+        include_plotlyjs=False,
+    )
 
     html_report = build_html_report(
         report_date=report_date,
