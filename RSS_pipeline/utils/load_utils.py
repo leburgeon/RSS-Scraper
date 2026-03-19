@@ -11,36 +11,6 @@ def logging_setup():
 logger = logging_setup()    
 
 
-def update_feed_metadata(feed_id: str, most_recent_article_datetime: str, table: boto3.resources.factory.dynamodb.Table):
-    """
-    Update feed metadata with new etag, last_modified and most recent article datetime.
-    """
-    response = table.update_item(
-        Key={
-            "PK": f"FEED#{feed_id}",
-            "SK": "META"
-        },
-        UpdateExpression="SET most_recent_article_datetime = :most_recent_article_datetime",
-        ExpressionAttributeValues={
-            ":most_recent_article_datetime": most_recent_article_datetime
-        },
-        ReturnValues="UPDATED_NEW"
-    )
-    return response
-
-
-def get_most_recent_article_datetime(feed_id: str, table: boto3.resources.factory.dynamodb.Table) -> str:
-    """
-    Get the most recent article datetime for a feed.
-    """
-    response = table.get_item(
-        Key={
-            "PK": f"FEED#{feed_id}",
-            "SK": "META"
-        }
-    )
-    item = response.get("Item", {})
-    return item.get("most_recent_article_datetime", None)
 
 
 def enrich_impressions_with_article_metadata(impressions: list[dict], article: dict) -> list[dict]:
@@ -56,7 +26,7 @@ def enrich_impressions_with_article_metadata(impressions: list[dict], article: d
     return impressions
 
 
-def insert_item(item: dict, table: boto3.resources.factory.dynamodb.Table):
+def insert_item(item: dict, table: Any):
     """Insert a item into the database.
     """
     # add error handling for empty item
@@ -72,7 +42,7 @@ def insert_item(item: dict, table: boto3.resources.factory.dynamodb.Table):
         raise
 
 
-def insert_items(items: list[dict], table: boto3.resources.factory.dynamodb.Table):
+def insert_items(items: list[dict], table: Any):
     """Insert multiple items into the database.
     """
     # add error handling for empty list

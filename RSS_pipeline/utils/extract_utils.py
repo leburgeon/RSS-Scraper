@@ -89,15 +89,15 @@ def poll_rss_feed_for_articles(feed_url) -> list[Article]:
     return articles
 
 
-def filter_articles_by_date(
-    articles: list[Article],
-    most_recent_date: str
-) -> list[Article]:
-    """Filter articles published strictly after most_recent_date.
-    Expects most_recent_date as an ISO 8601 string.
+def filter_articles_by_date(articles: list[Article], latest_article_date: str = None) -> list[Article]:
+    """Filter articles published strictly after latest_article_date.
+    Expects latest_article_date as an ISO 8601 string.
     Articles with unparseable dates are excluded.
     """
-    cutoff = datetime.fromisoformat(most_recent_date)
+    if latest_article_date is None:
+        return articles
+    
+    cutoff = datetime.fromisoformat(latest_article_date)
     filtered = []
     for article in articles:
         if article.published_at > cutoff:

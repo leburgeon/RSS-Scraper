@@ -6,6 +6,7 @@ python-dotenv
 google-genai
 pydantic
 spaCy
+boto3
 # After installing, run:
 # pip install google-genai
 
