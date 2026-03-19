@@ -8,10 +8,17 @@ resource "aws_ecr_repository" "c22_rss_scraper_repository" {
 resource "aws_dynamodb_table" "c22_rss_scraper_table" {
   name         = "c22-rss-scraper-table"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  
+
+  hash_key  = "PK"
+  range_key = "SK"
+
   attribute {
     name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
     type = "S"
   }
 }
