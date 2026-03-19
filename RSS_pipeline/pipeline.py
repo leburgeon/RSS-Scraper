@@ -80,6 +80,14 @@ def extract_entity_mentions_and_sentiments(articles) -> list[EntityMention]:
 
     return entity_mentions
 
+def load_entity_mentions(entity_mentions, table):
+    """ Load the extracted entity mentions into the database."""
+    # Convert entity mentions to item format for database insertion
+    items_to_insert = [entity.to_item_format() for entity in entity_mentions]
+
+    # Insert entity mentions into the database
+    insert_items(items_to_insert, table)
+
 
 
 def main():
@@ -99,8 +107,9 @@ def main():
     # Extract entities and sentiments for the articles to be loaded, enrich with article metadata, and convert to item format for database insertion
     enriched_entity_mentions = extract_entity_mentions_and_sentiments(articles_to_load)
 
-    print(f"Extracted entity mentions and sentiments for {len(enriched_entity_mentions)} entities.")
-    print([entity.to_item_format() for entity in enriched_entity_mentions])
+    # Load the extracted entity mentions into the database
+    load_entity_mentions(enriched_entity_mentions, table)
+
 
     
 
