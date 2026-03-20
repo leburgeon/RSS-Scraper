@@ -151,7 +151,7 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
     essential = true
     secrets = [
       {
-        name      = "LLM_API_KEY"
+        name      = "OPENAI_API_KEY"
         valueFrom = aws_secretsmanager_secret.llm_api_key.arn
       },
       {
