@@ -9,17 +9,12 @@ which will run the RAG pipeline and return a response. The response will then be
 import streamlit as st
 import requests
 
-def get_llm_response(user_input:str) -> str:
-    """This functions sends the user_input to a backend lambda function via AWS API Gateway,
-    and returns the response from the lambda function."""
 
-    
-
-
+from aws_lambda import send_user_input_to_llm
 
 
 # Set the title of the app
-st.title('RAG Chatbot')
+st.title('Tech Company News Chatbot')
 
 # Initialize chat history in session state if it doesn't exist
 # session_state persists data across Streamlit reruns
@@ -46,8 +41,6 @@ user_input = st.text_input(
 if st.button('Find Answer!'):
     if user_input.strip() != "":
 
-        get_llm_response(user_input)
-
         # Add user message to chat history
         st.session_state.chat_history.append({
             'role': 'user',
@@ -55,26 +48,30 @@ if st.button('Find Answer!'):
         })
 
         response = requests.post(
-            "https://r7dhlutwgk.execute-api.eu-west-2.amazonaws.com/chat", 
+            "https://r7dhlutwgk.execute-api.eu-west-2.amazonaws.com/chat",
             params={"question": user_input})
 
-        bot_response = response.json()
+        if response.status_code != 200:
+            st.session_state.chat_history.append({
+                'role': 'assistant',
+                'content': "Sorry, there was an error processing your request. Please try again later."
+            })
+        else:
+            bot_response = response.json()
 
-        st.session_state.chat_history.append({
-            'role': 'assistant',
-            'content': bot_response['response']
-        })
+            st.session_state.chat_history.append({
+                'role': 'assistant',
+                'content': bot_response['response']
+            })
+
+        # bot_response = send_user_input_to_llm(user_input)
+
+        # st.session_state.chat_history.append({
+        #     'role': 'assistant',
+        #     'content': bot_response 
+        # })
 
         # Rerun the app to update the chat display
         st.rerun()
     else:
         st.warning('Please enter a question before clicking Send.')
-
-
-
-
-
-
-
-
-
