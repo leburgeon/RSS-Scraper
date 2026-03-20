@@ -3,3 +3,4 @@ pandas
 pytest
 plotly
 pylint
+python-dotenv

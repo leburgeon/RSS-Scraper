@@ -1,12 +1,8 @@
-""" Script to generate the HTML report for the newsletter using 
-defined metrics for mention volume, sentiment distribution and share of voice. 
+""" Script to generate the HTML report for the newsletter using
+defined metrics for mention volume, sentiment distribution and share of voice.
 Compatible for lambda function too"""
 
-import logging
-from pathlib import Path
-import pandas as pd
-import plotly.graph_objects as go
-
+import os
 from metrics import (
     recent_dates,
     retrieve_dynamodb_table,
@@ -18,6 +14,15 @@ from metrics import (
     top_3_rows,
     bottom_3_rows,
 )
+import logging
+from pathlib import Path
+import pandas as pd
+import boto3
+import plotly.graph_objects as go
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -56,10 +61,7 @@ def build_metric_table(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     return metric_table_df
 
 
-def build_sentiment_bar_chart(
-        sentiment_df: pd.DataFrame,
-        title: str,
-        include_plotlyjs: str = "cdn",) -> str:
+def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
     """Grouped bar chart for company sentiment counts."""
 
     if sentiment_df.empty:
@@ -77,38 +79,23 @@ def build_sentiment_bar_chart(
 
     fig = go.Figure()
 
-    fig.add_trace(
-        go.Bar(
-            name="Positive",
-            x=company_names,
-            y=positive_values,
-            text=positive_values,
-            textposition="outside",
-            marker_color="limegreen"
-        )
-    )
+    bar_data = [
+        ("Positive", positive_values, "limegreen"),
+        ("Neutral", neutral_values, "blue"),
+        ("Negative", negative_values, "red")
+    ]
 
-    fig.add_trace(
-        go.Bar(
-            name="Neutral",
-            x=company_names,
-            y=neutral_values,
-            text=neutral_values,
-            textposition="outside",
-            marker_color="blue"
+    for bar_name, bar_values, bar_colour in bar_data:
+        fig.add_trace(
+            go.Bar(
+                name=bar_name,
+                x=company_names,
+                y=bar_values,
+                text=bar_values,
+                textposition="outside",
+                marker_color=bar_colour
+            )
         )
-    )
-
-    fig.add_trace(
-        go.Bar(
-            name="Negative",
-            x=company_names,
-            y=negative_values,
-            text=negative_values,
-            textposition="outside",
-            marker_color="red"
-        )
-    )
 
     for index in range(len(company_names) - 1):
         fig.add_vline(
@@ -132,7 +119,6 @@ def build_sentiment_bar_chart(
 
     chart_html = fig.to_html(
         full_html=False,
-        include_plotlyjs=include_plotlyjs,
         config={"displayModeBar": False},
     )
 
@@ -331,7 +317,6 @@ def generate_report_html(table_name: str, region_name: str) -> str:
     bottom_sentiment_chart_html = build_sentiment_bar_chart(
         bottom_sentiment_df,
         f"Companies most negatively talked about companies in date range {report_date}",
-        include_plotlyjs=False,
     )
 
     html_report = build_html_report(
@@ -350,25 +335,45 @@ def generate_report_html(table_name: str, region_name: str) -> str:
 def lambda_handler(event, context):
     """Returns the HTML report in the response body for the Lambda function."""
 
-    table_name = "c22_charlie_media_mvp"
-    region_name = "eu-west-2"
+    table_name = os.environ["table_name"]
+    region_name = os.environ["region_name"]
+    sender_email = os.environ["sender_email"]
+    recipient_email = os.environ["recipient_email"]
 
     html_report = generate_report_html(table_name, region_name)
 
+    ses_client = boto3.client("ses", region_name=region_name)
+
+    ses_client.send_email(
+        Source=sender_email,
+        Destination={
+            "ToAddresses": [recipient_email]
+        },
+        Message={
+            "Subject": {
+                "Data": "Daily Media Report"
+            },
+            "Body": {
+                "Html": {
+                    "Data": html_report
+                }
+            }
+        }
+    )
+
+    logging.info("Report email sent successfully")
+
     return {
         "statusCode": 200,
-        "headers": {
-            "Content-Type": "text/html"
-        },
-        "body": html_report
+        "body": "Report generated and emailed successfully"
     }
 
 
 def main():
     """Main function to generate and save the HTML report locally."""
 
-    table_name = "c22-rss-scraper-table"
-    region_name = "eu-west-2"
+    table_name = os.environ["table_name"]
+    region_name = os.environ["region_name"]
 
     html_report = generate_report_html(table_name, region_name)
     save_html_report(html_report, "daily_media_report.html")

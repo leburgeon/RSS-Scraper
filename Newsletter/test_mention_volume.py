@@ -1,7 +1,6 @@
 import pandas as pd
 
 from metrics import (
-    recent_dates,
     mentions_dataframe_creation,
     filter_company_rows,
     compute_mention_volume,

@@ -143,9 +143,9 @@ def compute_mention_volume(df: pd.DataFrame) -> pd.DataFrame:
 
     mention_volume_df = (
         company_df.groupby(["entity_name", "entity_type"],
-                           as_index=False
-                           )
-        .agg(mention_volume=("article_guid", "count"))
+                           as_index=False)
+
+        .agg(mention_volume=("article_guid", "nunique"))
         .sort_values(by="mention_volume", ascending=False)
         .reset_index(drop=True)
     )
@@ -333,23 +333,3 @@ def bottom_3_rows(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
     bottom_3_df = non_zero_df.sort_values(
         by=metric_column, ascending=True).head(3).copy()
     return bottom_3_df
-
-
-# def main():
-#     """Main function to run the metrics calculations and print results."""
-
-#     table_name = "c22-rss-scraper-table"
-#     region_name = "eu-west-2"
-
-#     article_dates = recent_dates(2)
-
-#     table = retrieve_dynamodb_table(table_name, region_name)
-#     items = mention_items_for_dates(table, article_dates)
-
-#     if not items:
-#         logging.info("No mention items found for the selected date range")
-#         return
-
-
-# if __name__ == "__main__":
-#     main()
