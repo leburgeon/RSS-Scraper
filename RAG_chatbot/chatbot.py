@@ -10,8 +10,6 @@ import streamlit as st
 import requests
 
 
-from aws_lambda import send_user_input_to_llm
-
 
 # Set the title of the app
 st.title('Tech Company News Chatbot')
@@ -47,15 +45,21 @@ if st.button('Find Answer!'):
             'content': user_input
         })
 
+        print(f"User input: {user_input}")
+
         response = requests.post(
             "https://r7dhlutwgk.execute-api.eu-west-2.amazonaws.com/chat",
-            params={"question": user_input})
+            json={"question": user_input})
+        
+        print(response.text)
 
         if response.status_code != 200:
             st.session_state.chat_history.append({
                 'role': 'assistant',
                 'content': "Sorry, there was an error processing your request. Please try again later."
             })
+            
+
         else:
             bot_response = response.json()
 
