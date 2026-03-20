@@ -40,10 +40,7 @@ class Article:
             article_link) -> str:
         """Fetch HTML from article link."""
         headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; "
-                "Win64; x64) AppleWebKit/537.36"
-            )
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         try:
             response = requests.get(
@@ -65,6 +62,8 @@ class Article:
         try:
             html_content = Article._get_html_content_from_article_link(
                 article_link)
+            if html_content is None:
+                return None
             soup = BeautifulSoup(html_content, 'html.parser')
 
             paragraphs = soup.find_all('p')
