@@ -9,12 +9,8 @@ which will run the RAG pipeline and return a response. The response will then be
 import streamlit as st
 import requests
 
-def get_llm_response(user_input:str) -> str:
-    """This functions sends the user_input to a backend lambda function via AWS API Gateway,
-    and returns the response from the lambda function."""
 
-    
-
+from aws_lambda import send_user_input_to_llm
 
 
 
@@ -46,8 +42,6 @@ user_input = st.text_input(
 if st.button('Find Answer!'):
     if user_input.strip() != "":
 
-        get_llm_response(user_input)
-
         # Add user message to chat history
         st.session_state.chat_history.append({
             'role': 'user',
@@ -59,6 +53,9 @@ if st.button('Find Answer!'):
             params={"question": user_input})
 
         bot_response = response.json()
+
+        # bot_response = {}
+        # bot_response['response'] = send_user_input_to_llm(user_input)
 
         st.session_state.chat_history.append({
             'role': 'assistant',
