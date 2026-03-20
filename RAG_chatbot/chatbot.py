@@ -13,7 +13,6 @@ import requests
 from aws_lambda import send_user_input_to_llm
 
 
-
 # Set the title of the app
 st.title('RAG Chatbot')
 
@@ -49,29 +48,23 @@ if st.button('Find Answer!'):
         })
 
         response = requests.post(
-            "https://r7dhlutwgk.execute-api.eu-west-2.amazonaws.com/chat", 
+            "https://r7dhlutwgk.execute-api.eu-west-2.amazonaws.com/chat",
             params={"question": user_input})
 
-        bot_response = response.json()
+        if response.status_code != 200:
+            st.session_state.chat_history.append({
+                'role': 'assistant',
+                'content': "Sorry, there was an error processing your request. Please try again later."
+            })
+        else:
+            bot_response = response.json()
 
-        # bot_response = {}
-        # bot_response['response'] = send_user_input_to_llm(user_input)
-
-        st.session_state.chat_history.append({
-            'role': 'assistant',
-            'content': bot_response['response']
-        })
+            st.session_state.chat_history.append({
+                'role': 'assistant',
+                'content': bot_response['response']
+            })
 
         # Rerun the app to update the chat display
         st.rerun()
     else:
         st.warning('Please enter a question before clicking Send.')
-
-
-
-
-
-
-
-
-
