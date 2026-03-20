@@ -9,6 +9,7 @@ from utils.transform_utils import (
     setup_nlp
 )
 from utils.load_utils import get_latest_article_date, update_feed_latest_article_date, insert_items
+from RAG_embedding import upload_articles_to_RAG_RDS
 from dotenv import load_dotenv
 import boto3
 
@@ -103,6 +104,7 @@ def main():
 
     # Load the articles into the database and update the most recent article date for the feed
     load_articles(articles_to_load, table)
+    upload_articles_to_RAG_RDS(articles_to_load)
 
     # Extract entities and sentiments for the articles to be loaded, enrich with article metadata, and convert to item format for database insertion
     enriched_entity_mentions = extract_entity_mentions_and_sentiments(articles_to_load)
