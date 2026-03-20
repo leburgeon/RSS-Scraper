@@ -109,7 +109,7 @@ resource "aws_iam_role_policy_attachment" "c22_rss_scraper_custom_attach" {
 
 # Creates the secrets manager secret to store the LLM API key
 resource "aws_secretsmanager_secret" "llm_api_key" {
-  name        = "c22-llm-api-key"
+  name        = "c22-rss-scraper-llm-api-key"
   description = "API key for the LLM service used by the RSS scraper"
 }
 
@@ -125,7 +125,7 @@ resource "aws_secretsmanager_secret_version" "llm_api_key_version" {
 
 # Creates the secrets manager secret to store the RDS database credentials
 resource "aws_secretsmanager_secret" "db_credentials" {
-  name        = "c22-db-credentials"
+  name        = "c22-rss-scraper-db-credentials"
   description = "RDS database credentials for the RSS scraper"
 }
 
