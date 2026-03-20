@@ -10,7 +10,7 @@ REPO_NAME="c22-rag-chatbot-lambda-repo"
 ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 
 echo "🔐 Logging into AWS ECR..."
-aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_URI
+aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_UqRI
 
 echo "🏗️  Building the Docker image (forcing amd64 architecture for AWS Lambda)..."
 docker build --platform linux/amd64 --provenance=false -t $REPO_NAME .
