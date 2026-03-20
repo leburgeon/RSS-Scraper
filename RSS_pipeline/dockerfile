@@ -6,6 +6,9 @@ COPY requirements.txt .
 
 RUN pip3 install -r requirements.txt
 
-COPY . .
+COPY requirements.txt .
+COPY pipeline.py .
+COPY RAG_embedding.py .
+COPY utils/ utils/
 
 CMD ["python", "pipeline.py"]

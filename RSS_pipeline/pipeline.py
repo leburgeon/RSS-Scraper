@@ -116,7 +116,7 @@ def main():
         articles_to_load = extract_articles(table, feed_url, feed_pk)
 
         # # Load the articles into the database and update the most recent article date for the feed
-        # upload_articles_to_RAG_RDS(articles_to_load)
+        upload_articles_to_RAG_RDS(articles_to_load)
 
         # Load the articles into the database and update the most recent article date for the feed
         load_articles(articles_to_load, table, feed_pk)
