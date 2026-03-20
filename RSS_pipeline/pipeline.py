@@ -9,6 +9,7 @@ from utils.transform_utils import (
     setup_nlp
 )
 from utils.load_utils import get_latest_article_date, update_feed_latest_article_date, insert_items
+from RAG_embedding import upload_articles_to_RAG_RDS
 from dotenv import load_dotenv
 import boto3
 
@@ -113,6 +114,9 @@ def main():
     for feed_pk, feed_url in feed_data:
         logging.info(f"Processing feed: {feed_pk} with URL: {feed_url}")
         articles_to_load = extract_articles(table, feed_url, feed_pk)
+        
+        # Load the articles into the database and update the most recent article date for the feed
+        upload_articles_to_RAG_RDS(articles_to_load)
 
         # Load the articles into the database and update the most recent article date for the feed
         load_articles(articles_to_load, table, feed_pk)
