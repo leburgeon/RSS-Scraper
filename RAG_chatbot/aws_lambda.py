@@ -22,7 +22,6 @@ load_dotenv()
 def embed_user_question(user_input: str) -> list[float]:
     """Embed a chunk of text using OpenAI's embedding API."""
 
-
     if not isinstance(user_input, str):
         raise ValueError("chunk must be a string")
 
@@ -90,17 +89,20 @@ def execute_query(query: str, question_embed: list[float], conn: psycopg2.extens
             cursor.execute(query, (question_embed,))
             results = cursor.fetchall()
             return results
-        
+
     except psycopg2.Error as e:
         logging.error(f"Error executing query: {e}")
         return None
 
 
-
 def get_openai_client(api_key: str):
     """Initializes and returns the OpenAI client."""
-    return OpenAI(api_key=api_key)
-
+    try:
+        ai = OpenAI(api_key=api_key)
+        return ai
+    except Exception as e:
+        logging.error(f"Error initializing OpenAI client: {e}")
+        return None
 
 
 def get_llm_response(client, context_list: list[str], user_query: str) -> str:
@@ -110,11 +112,13 @@ def get_llm_response(client, context_list: list[str], user_query: str) -> str:
     """
 
     chunks = [
-        text for text, _, _ in context_list
+        # Extract the chunk text from the context list
+        text for text, date, _ in context_list
     ]
 
     dates = [
-        dt.strftime("%d %b %Y, %H:%M") for _, dt, _ in context_list
+        # Extract the published_at date and format it as a string
+        date.strftime("%d %b %Y, %H:%M") for text, date, _ in context_list
     ]
 
     # Flatten the list of strings into one readable block
@@ -135,12 +139,12 @@ def get_llm_response(client, context_list: list[str], user_query: str) -> str:
         CONTEXT:\n{formatted_text}
 
         DATES: \n{formatted_dates}  """
-        
-        )
+
+    )
 
     try:
         response = client.chat.completions.create(
-            model="gpt-5-nano",  # Or your preferred model
+            model=os.getenv("GPT_MODEL"),  # Or your preferred model
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_query}
@@ -149,6 +153,7 @@ def get_llm_response(client, context_list: list[str], user_query: str) -> str:
         return response.choices[0].message.content
     except Exception as e:
         return f"Error connecting to OpenAI: {str(e)}"
+
 
 def send_user_input_to_llm(user_input: str) -> str:
     """Main function to be called by lambda. Takes user input, gets relevant context from RDS, and returns the LLM response."""
@@ -162,6 +167,7 @@ def send_user_input_to_llm(user_input: str) -> str:
     llm_response = get_llm_response(openai_client, relevant_chunks, user_input)
 
     return llm_response
+
 
 def lambda_handler(event, context):
     """AWS Lambda handler function."""
@@ -178,6 +184,3 @@ def lambda_handler(event, context):
         "statusCode": 200,
         "body": json.dumps({"response": response})
     }
-
-
-

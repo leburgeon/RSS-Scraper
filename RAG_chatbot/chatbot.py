@@ -14,7 +14,7 @@ from aws_lambda import send_user_input_to_llm
 
 
 # Set the title of the app
-st.title('RAG Chatbot')
+st.title('Tech Company News Chatbot')
 
 # Initialize chat history in session state if it doesn't exist
 # session_state persists data across Streamlit reruns
@@ -63,6 +63,13 @@ if st.button('Find Answer!'):
                 'role': 'assistant',
                 'content': bot_response['response']
             })
+
+        # bot_response = send_user_input_to_llm(user_input)
+
+        # st.session_state.chat_history.append({
+        #     'role': 'assistant',
+        #     'content': bot_response 
+        # })
 
         # Rerun the app to update the chat display
         st.rerun()
