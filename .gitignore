@@ -231,3 +231,5 @@ crash.log
 
 # Ignore any local state for the NEXT projects
 # (We will keep the bootstrap one manually)
+
+.terraform.lock.hcl # Should this be here? Maybe not, but it can be regenerated and is often machine-specific, so we ignore it for now.

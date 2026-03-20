@@ -38,3 +38,4 @@ data "aws_subnets" "public_subnets" {
     values = ["c22-public-subnet-*"]
   }
 }
+

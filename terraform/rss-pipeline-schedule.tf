@@ -48,7 +48,7 @@ resource "aws_security_group" "c22_rss_scraper_sg" {
   }
 }
 
-# Creates the IAM role assumed by the ECS task to pull images, log, and access DynamoDB
+# Creates the IAM role assumed by the ECS task definition to pull images, log, and access DynamoDB
 resource "aws_iam_role" "c22_rss_scraper_role" {
   name = "c22-rss-scraper-role"
   assume_role_policy = jsonencode({
@@ -58,6 +58,25 @@ resource "aws_iam_role" "c22_rss_scraper_role" {
       Effect    = "Allow"
       Principal = { Service = "ecs-tasks.amazonaws.com" }
     }]
+  })
+}
+
+# Creates a custom IAM policy granting the scraper permission to read secrets from Secrets Manager
+resource "aws_iam_role_policy" "task-execution-role-policy" {
+  name = "task-execution-role-policy"
+  role = aws_iam_role.c22_rss_scraper_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = [
+          aws_secretsmanager_secret.db_credentials.arn,
+          aws_secretsmanager_secret.llm_api_key.arn
+        ]
+      }
+    ]
   })
 }
 
@@ -88,6 +107,34 @@ resource "aws_iam_role_policy_attachment" "c22_rss_scraper_custom_attach" {
   policy_arn = aws_iam_policy.c22_rss_scraper_policy.arn
 }
 
+# Creates the secrets manager secret to store the LLM API key
+resource "aws_secretsmanager_secret" "llm_api_key" {
+  name        = "c22-llm-api-key"
+  description = "API key for the LLM service used by the RSS scraper"
+}
+
+# Attaches the LLM API key value to the Secrets Manager secret
+resource "aws_secretsmanager_secret_version" "llm_api_key_version" {
+  secret_id     = aws_secretsmanager_secret.llm_api_key.id
+  secret_string = var.llm_api_key
+
+  lifecycle {
+    ignore_changes = [ secret_string ]
+  }
+}
+
+# Creates the secrets manager secret to store the RDS database credentials
+resource "aws_secretsmanager_secret" "db_credentials" {
+  name        = "c22-db-credentials"
+  description = "RDS database credentials for the RSS scraper"
+}
+
+# Attaches the RDS password to the Secrets Manager secret
+resource "aws_secretsmanager_secret_version" "db_credentials_version" {
+  secret_id     = aws_secretsmanager_secret.db_credentials.id
+  secret_string = aws_secretsmanager_secret_version.rds_master_password.secret_string
+}
+
 # Defines the ECS task blueprint, including CPU, memory, Docker image, and log routing
 resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
   family                   = "c22-rss-scraper-task-definition"
@@ -102,6 +149,42 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
     name      = "c22-rss-scraper-container"
     image     = "${aws_ecr_repository.c22_rss_scraper_repository.repository_url}:latest"
     essential = true
+    secrets = [
+      {
+        name      = "LLM_API_KEY"
+        valueFrom = aws_secretsmanager_secret.llm_api_key.arn
+      },
+      {
+        name      = "DB_CREDENTIALS"
+        valueFrom = aws_secretsmanager_secret.db_credentials.arn
+      }
+    ]
+    environment = [
+      {
+        name  = "TABLE_NAME"
+        value = aws_dynamodb_table.c22_rss_scraper_table.name
+      },
+      {
+        name  = "AWS_REGION"
+        value = data.aws_region.current.name
+      },
+      {
+        name  = "RDS_HOST"
+        value = aws_db_instance.rag_db.endpoint
+      },
+      {
+        name  = "RDS_PORT"
+        value = "5432"
+      },
+      {
+        name  = "RDS_DB_NAME"
+        value = "rag_database"
+      },
+      {
+        name  = "RDS_USERNAME"
+        value = "media_group_project_RAG_DB"
+      }
+    ]
     logConfiguration = {
       logDriver = "awslogs"
       options = {
