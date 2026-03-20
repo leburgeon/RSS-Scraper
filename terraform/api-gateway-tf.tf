@@ -56,12 +56,14 @@ resource "aws_lambda_function" "rag_container_lambda" {
 
   environment {
     variables = {
-      # These reference resources in your other .tf files!
-      LLM_API_KEY_SECRET_ARN = aws_secretsmanager_secret.llm_api_key.arn
-      DB_CREDS_SECRET_ARN    = aws_secretsmanager_secret.db_credentials.arn
-      DB_HOST                = aws_db_instance.rag_db.address
-      DB_PORT                = tostring(aws_db_instance.rag_db.port)
-      DB_NAME                = aws_db_instance.rag_db.db_name
+      # Passing the ARNs (Addresses) of the secrets
+      OPENAI_API_KEY = aws_secretsmanager_secret.llm_api_key.arn
+      RDS_PASSWORD    = aws_secretsmanager_secret.db_credentials.arn
+      
+      # Standard DB connection info
+      RDS_HOST                = aws_db_instance.rag_db.address
+      RDS_PORT                = tostring(aws_db_instance.rag_db.port)
+      RDS_DB_NAME             = aws_db_instance.rag_db.db_name
     }
   }
 }
