@@ -3,10 +3,11 @@ requests
 pytest
 beautifulsoup4
 python-dotenv
-google-genai
+openai
 pydantic
 spaCy
 boto3
+psycopg2-binary
 
 annotated-doc==0.0.4
 annotated-types==0.7.0
@@ -19,7 +20,7 @@ cryptography==46.0.5
 distro==1.9.0
 feedparser==6.0.12
 google-auth==2.49.1
-google-genai==1.68.0
+openai==2.29.0
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
@@ -70,7 +71,7 @@ distro==1.9.0
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
 feedparser==6.0.12
 google-auth==2.49.1
-google-genai==1.68.0
+openai==2.29.0
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
