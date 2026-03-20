@@ -88,22 +88,22 @@ def get_RDS_connection() -> psycopg2.extensions.connection:
 def embed_chunk_via_openai(chunk: str) -> list[float]:
     """Embed a chunk of text using OpenAI's embedding API."""
 
-    return [0.0] * 1536  # Placeholder embedding for testing purposes
+    # return [0.0] * 1536  # Placeholder embedding for testing purposes
 
-    # if not isinstance(chunk, str):
-    #     raise ValueError("chunk must be a string")
+    if not isinstance(chunk, str):
+        raise ValueError("chunk must be a string")
 
-    # api_key = os.getenv("OPENAI_API_KEY")
-    # if not api_key:
-    #     raise ValueError("OPENAI_API_KEY is not set")
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set")
 
-    # client = OpenAI(api_key=api_key)
-    # response = client.embeddings.create(
-    #     model="text-embedding-3-small",
-    #     input=chunk.strip(),
-    # )
+    client = OpenAI(api_key=api_key)
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=chunk.strip(),
+    )
 
-    # return response.data[0].embedding
+    return response.data[0].embedding
 
 
 def upload_articles_to_RAG_RDS(articles: list[Article]):
