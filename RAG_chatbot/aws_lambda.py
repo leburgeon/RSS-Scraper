@@ -140,7 +140,7 @@ def get_llm_response(client, context_list: list[str], user_query: str) -> str:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",  # Or your preferred model
+            model="gpt-5-nano",  # Or your preferred model
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_query}
