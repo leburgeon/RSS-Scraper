@@ -103,7 +103,7 @@ class RAGArticleChunk:
         """Upload the article chunk and its metadata to the RAG RDS."""
 
         insert_query = """
-                INSERT INTO article_chunks (chunk_id, chunk_text, chunk_embedding, entity_names, article_id, published_at)
+                INSERT INTO article_chunks (chunk_text, chunk_embedding, entity_names, article_id, published_at)
                 VALUES (%s, %s, %s, %s, %s
                 """
 
