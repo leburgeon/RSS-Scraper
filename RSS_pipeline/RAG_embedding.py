@@ -5,6 +5,18 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
+import logging
+
+from utils.transform_utils import extract_entities, setup_nlp
+from utils.extract_utils import Article
+from datetime import datetime
+import psycopg2 
+
+
+Article()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -56,3 +68,79 @@ def split_article_to_chunks(article: str, chunk_size: int = 500) -> list[str]:
 
     return chunks
 
+class RAGArticleChunk:
+    """A class representing a chunk of an article, its embedding, and associated metadata."""
+    def __init__(self, article_guid: str, chunk_text: str, article_date: datetime):
+        
+        self.article_id = article_guid
+        self.text = chunk_text
+        self.embedding = embed_chunk_via_openai(chunk_text)
+        self.entity_names = extract_entities(chunk_text, setup_nlp())
+        self.published_at = article_date
+    
+    @staticmethod
+    def get_RDS_connection() -> psycopg2.extensions.connection:
+        """Establish a connection to the RAG RDS using psycopg2."""
+
+        try:
+            conn = psycopg2.connect(
+                host=os.getenv("RDS_HOST"),
+                port=os.getenv("RDS_PORT"),
+                dbname=os.getenv("RDS_DB_NAME"),
+                user=os.getenv("RDS_USER"),
+                password=os.getenv("RDS_PASSWORD")
+            )
+            logging.info("Successfully connected to RDS.")
+
+        except psycopg2.Error as e:
+            logging.error(f"Error connecting to RDS: {e}")
+            return None
+        
+        return conn
+
+
+    def upload_to_RDS(self):
+        """Upload the article chunk and its metadata to the RAG RDS."""
+
+        insert_query = """
+                INSERT INTO article_chunks (chunk_id, chunk_text, chunk_embedding, entity_names, article_id, published_at)
+                VALUES (%s, %s, %s, %s, %s
+                """
+
+        conn = self.get_RDS_connection()
+        if conn is None:
+            logging.error("Failed to connect to RDS. Cannot upload chunk.")
+            return
+        
+        self.execute_query(insert_query, conn)
+        
+        conn.close()
+
+    def execute_query(self, insert_query: str, conn: psycopg2.extensions.connection):
+        """Execute the SQL insert query to upload the chunk data to RDS."""
+
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(insert_query, (
+                    self.article_id,
+                    self.text,
+                    self.embedding,
+                    self.entity_names,
+                    self.published_at
+                ))
+                conn.commit()
+                logging.info(
+                    f"Successfully uploaded chunk for article {self.article_id} to RDS.")
+            except Exception as e:
+                conn.rollback()
+                logging.error(f"Error uploading chunk to RDS: {e}")
+                logging.info("Connection rolled back.")
+
+    
+        
+
+
+    
+
+
+    
