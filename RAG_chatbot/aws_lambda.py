@@ -18,6 +18,9 @@ import json
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s - %(levelname)s - %(message)s")
+
 
 def embed_user_question(user_input: str) -> list[float]:
     """Embed a chunk of text using OpenAI's embedding API."""
@@ -171,8 +174,33 @@ def send_user_input_to_llm(user_input: str) -> str:
 
 def lambda_handler(event, context):
     """AWS Lambda handler function."""
-    user_input = event.get("question", "")
-    logging.info(f"Received user input: {event}")
+    logging.warning(f"Received event: {event}")
+
+    body = event.get("body")
+
+    logging.warning(f"Received body: {body}")
+
+    if body is None:
+        return {
+            "statusCode": 400,
+            "body": "No body provided in the request."
+        }
+
+    try:
+
+        data = json.loads(body)
+
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON decode error: {e}")
+        return {
+            "statusCode": 400,
+            "body": "Invalid JSON in request body."
+        }
+
+    user_input = data.get("question", "")
+
+    logging.info(f"Received user input: {user_input}")
+
     if not user_input:
         return {
             "statusCode": 400,
