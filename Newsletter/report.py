@@ -1,23 +1,27 @@
-""" Script to generate the HTML report for the newsletter using 
-defined metrics for mention volume, sentiment distribution and share of voice. 
+""" Script to generate the HTML report for the newsletter using
+defined metrics for mention volume, sentiment distribution and share of voice.
 Compatible for lambda function too"""
 
-import logging
-from pathlib import Path
-import pandas as pd
-import plotly.graph_objects as go
-
+import os
 from metrics import (
-    yesterday_date,
+    recent_dates,
     retrieve_dynamodb_table,
     mentions_dataframe_creation,
     compute_mention_volume,
     sentiment_distribution_calculate,
     share_of_voice_calculate,
-    mention_items_for_date,
+    mention_items_for_dates,
     top_3_rows,
     bottom_3_rows,
 )
+import logging
+from pathlib import Path
+import pandas as pd
+import boto3
+import plotly.graph_objects as go
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 logging.basicConfig(level=logging.INFO)
@@ -58,7 +62,7 @@ def build_metric_table(df: pd.DataFrame, metric_column: str) -> pd.DataFrame:
 
 
 def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
-    """grouped bar chart for company sentiment distribution"""
+    """Grouped bar chart for company sentiment counts."""
 
     if sentiment_df.empty:
         return f"""
@@ -69,51 +73,44 @@ def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
         """
 
     company_names = sentiment_df["entity_name"].tolist()
-    positive_values = (sentiment_df["positive_pct"] * 100).round(2).tolist()
-    neutral_values = (sentiment_df["neutral_pct"] * 100).round(2).tolist()
-    negative_values = (sentiment_df["negative_pct"] * 100).round(2).tolist()
+    positive_values = sentiment_df["positive"].tolist()
+    neutral_values = sentiment_df["neutral"].tolist()
+    negative_values = sentiment_df["negative"].tolist()
 
     fig = go.Figure()
 
-    fig.add_trace(
-        go.Bar(
-            name="Positive",
-            x=company_names,
-            y=positive_values,
-            text=[f"{value}%" for value in positive_values],
-            textposition="outside",
-            marker_color="limegreen"
-        )
-    )
+    bar_data = [
+        ("Positive", positive_values, "limegreen"),
+        ("Neutral", neutral_values, "blue"),
+        ("Negative", negative_values, "red")
+    ]
 
-    fig.add_trace(
-        go.Bar(
-            name="Neutral",
-            x=company_names,
-            y=neutral_values,
-            text=[f"{value}%" for value in neutral_values],
-            textposition="outside",
-            marker_color="blue"
+    for bar_name, bar_values, bar_colour in bar_data:
+        fig.add_trace(
+            go.Bar(
+                name=bar_name,
+                x=company_names,
+                y=bar_values,
+                text=bar_values,
+                textposition="outside",
+                marker_color=bar_colour
+            )
         )
-    )
 
-    fig.add_trace(
-        go.Bar(
-            name="Negative",
-            x=company_names,
-            y=negative_values,
-            text=[f"{value}%" for value in negative_values],
-            textposition="outside",
-            marker_color="red"
+    for index in range(len(company_names) - 1):
+        fig.add_vline(
+            x=index + 0.5,
+            line_width=1,
+            line_dash="dash",
+            line_color="gray",
+            opacity=0.6
         )
-    )
 
     fig.update_layout(
         barmode="group",
         title=title,
         xaxis_title="Company Name",
-        yaxis_title="Sentiment Percentage",
-        yaxis={"range": [0, 100]},
+        yaxis_title="Sentiment Count",
         margin={"l": 40, "r": 20, "t": 60, "b": 40},
         height=450,
         template="plotly_white",
@@ -121,8 +118,7 @@ def build_sentiment_bar_chart(sentiment_df: pd.DataFrame, title: str) -> str:
     )
 
     chart_html = fig.to_html(
-        full_html=False,  # Only return the div for the chart, not a full HTML document
-        include_plotlyjs="cdn",
+        full_html=False,
         config={"displayModeBar": False},
     )
 
@@ -232,10 +228,10 @@ def build_html_report(
             </section>
 
             {dataframe_to_html_table(top_mention_volume_table, "Mention Volume",
-                                     subheading="Companies appearing in the most unique articles yesterday")}
+                                     subheading="Companies appearing in the most unique articles in this date range")}
 
             {dataframe_to_html_table(top_share_of_voice_table, "Share of Voice",
-                                         subheading="Companies most discussed across all mentions yesterday")}
+                                         subheading="Companies most discussed across all mentions in this date range")}
             {top_sentiment_chart_html}
 
             <section class="card full-width">
@@ -243,9 +239,9 @@ def build_html_report(
             </section>
 
             {dataframe_to_html_table(bottom_mention_volume_table, "Mention Volume",
-                                             subheading="Companies appearing in the fewest unique articles yesterday")}
+                                             subheading="Companies appearing in the fewest unique articles in this date range")}
             {dataframe_to_html_table(bottom_share_of_voice_table, "Share of Voice",
-                                                 subheading="Companies least discussed across all mentions yesterday")}
+                                                 subheading="Companies least discussed across all mentions in this date range")}
             {bottom_sentiment_chart_html}
         </div>
     </body>
@@ -262,20 +258,21 @@ def save_html_report(html_content: str, output_path: str):
 
 def generate_report_html(table_name: str, region_name: str) -> str:
     """Run the report pipeline and return the HTML string."""
-    report_date = yesterday_date()
+    article_dates = recent_dates(2)
+    report_date = f"{article_dates[0]} to {article_dates[-1]}"
     logging.info("Generating HTML report for %s", report_date)
 
     table = retrieve_dynamodb_table(table_name, region_name)
-    items = mention_items_for_date(table, report_date)
+    items = mention_items_for_dates(table, article_dates)
 
     if not items:
-        logging.info("No mention items found for yesterday")
+        logging.info("No mention items found for the selected date range")
         return f"""
         <html>
             <body>
                 <h1>Daily Media Report</h1>
                 <p>Report date: {report_date}</p>
-                <p>No data available for this date.</p>
+                <p>No data available for this date range.</p>
             </body>
         </html>
         """
@@ -286,19 +283,21 @@ def generate_report_html(table_name: str, region_name: str) -> str:
     sentiment_distribution_df = sentiment_distribution_calculate(df)
     share_of_voice_df = share_of_voice_calculate(df)
     top_mention_volume_df = top_3_rows(mention_volume_df, "mention_volume")
+
     bottom_mention_volume_df = bottom_3_rows(
-        mention_volume_df, "mention_volume")
+        mention_volume_df[mention_volume_df["mention_volume"] >= 5], "mention_volume")
+    # filter mention volume for bottom companies to those with at least 5 mentions to avoid outliers
 
     top_sentiment_df = top_3_rows(
-        sentiment_distribution_df, "positive_pct")
+        sentiment_distribution_df, "positive")
     bottom_sentiment_df = top_3_rows(
-        sentiment_distribution_df, "negative_pct")
+        sentiment_distribution_df, "negative")
 
     top_share_of_voice_df = top_3_rows(
         share_of_voice_df, "share_of_voice")
 
     bottom_share_of_voice_df = bottom_3_rows(
-        share_of_voice_df, "share_of_voice")
+        share_of_voice_df[share_of_voice_df["share_of_voice"] >= 0.02], "share_of_voice")
 
     top_mention_volume_table = build_metric_table(
         top_mention_volume_df, "mention_volume")
@@ -313,10 +312,12 @@ def generate_report_html(table_name: str, region_name: str) -> str:
         bottom_share_of_voice_df, "share_of_voice")
 
     top_sentiment_chart_html = build_sentiment_bar_chart(
-        top_sentiment_df, "Companies most positively talked about yesterday")
+        top_sentiment_df, f"Companies most positively talked about in date range {report_date}")
 
     bottom_sentiment_chart_html = build_sentiment_bar_chart(
-        bottom_sentiment_df, "Companies most negatively talked about companies yesterday")
+        bottom_sentiment_df,
+        f"Companies most negatively talked about companies in date range {report_date}",
+    )
 
     html_report = build_html_report(
         report_date=report_date,
@@ -334,25 +335,45 @@ def generate_report_html(table_name: str, region_name: str) -> str:
 def lambda_handler(event, context):
     """Returns the HTML report in the response body for the Lambda function."""
 
-    table_name = "c22_charlie_media_mvp"
-    region_name = "eu-west-2"
+    table_name = os.environ["table_name"]
+    region_name = os.environ["region_name"]
+    sender_email = os.environ["sender_email"]
+    recipient_email = os.environ["recipient_email"]
 
     html_report = generate_report_html(table_name, region_name)
 
+    ses_client = boto3.client("ses", region_name=region_name)
+
+    ses_client.send_email(
+        Source=sender_email,
+        Destination={
+            "ToAddresses": [recipient_email]
+        },
+        Message={
+            "Subject": {
+                "Data": "Daily Media Report"
+            },
+            "Body": {
+                "Html": {
+                    "Data": html_report
+                }
+            }
+        }
+    )
+
+    logging.info("Report email sent successfully")
+
     return {
         "statusCode": 200,
-        "headers": {
-            "Content-Type": "text/html"
-        },
-        "body": html_report
+        "body": "Report generated and emailed successfully"
     }
 
 
 def main():
     """Main function to generate and save the HTML report locally."""
 
-    table_name = "c22_charlie_media_mvp"
-    region_name = "eu-west-2"
+    table_name = os.environ["table_name"]
+    region_name = os.environ["region_name"]
 
     html_report = generate_report_html(table_name, region_name)
     save_html_report(html_report, "daily_media_report.html")
