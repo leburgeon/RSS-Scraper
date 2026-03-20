@@ -155,7 +155,7 @@ resource "aws_scheduler_schedule" "daily_report_schedule" {
   name       = "rss-report-daily-report-7am"
   group_name = "default"
 
-  schedule_expression          = "cron(*/5 * * * ? *)"
+  schedule_expression          = "cron(0 7 * * ? *)"
   schedule_expression_timezone = "Europe/London"
 
   flexible_time_window {
