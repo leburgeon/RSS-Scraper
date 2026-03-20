@@ -14,7 +14,7 @@ import logging
 from openai import OpenAI
 import psycopg2
 from dotenv import load_dotenv
-from datetime import datetime as dt
+import json
 
 load_dotenv()
 
@@ -22,7 +22,6 @@ load_dotenv()
 def embed_user_question(user_input: str) -> list[float]:
     """Embed a chunk of text using OpenAI's embedding API."""
 
-    # return [0.0] * 1536  # Placeholder embedding for testing purposes
 
     if not isinstance(user_input, str):
         raise ValueError("chunk must be a string")
@@ -177,9 +176,7 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": {
-            "response": response
-        }
+        "body": json.dumps({"response": response})
     }
 
 
