@@ -4,8 +4,7 @@ sentiments from article text via LLM.
 """
 
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+from openai import OpenAI
 import logging
 from pydantic import BaseModel
 from typing import List, Literal
@@ -14,6 +13,69 @@ from spacy.util import compile_suffix_regex
 from utils.extract_utils import Article
 
 load_dotenv()
+
+TECH_COMPANY_ALIASES = {
+    "OpenAI": [
+        "Open AI", "OPENAI", "Open-AI",
+        "OpenAI Inc", "OpenAI LP"
+    ],
+    "Microsoft": [
+        "MSFT", "MS", "Microsoft Corp",
+        "Microsoft Corporation"
+    ],
+    "Google": [
+        "Alphabet", "Google LLC",
+        "Alphabet Inc", "Google Inc"
+    ],
+    "Anthropic": [
+        "Anthropic Inc", "Anthropic PBC"
+    ],
+    "Tesla": [
+        "TSLA", "Tesla Inc",
+        "Tesla Motors"
+    ],
+    "Nvidia": [
+        "NVDA", "Nvidia Corp",
+        "Nvidia Corporation"
+    ],
+    "SpaceX": [
+        "Space Exploration Technologies",
+        "Space X", "SpaceX Inc"
+    ],
+    "Apple": [
+        "AAPL", "Apple Inc",
+        "Apple Computer"
+    ],
+    "Meta": [
+        "Facebook", "Meta Platforms",
+        "META", "F"
+    ],
+    "Amazon": [
+        "AMZN", "Amazon.com",
+        "Amazon Web Services", "AWS"
+    ],
+    "Amazon AWS": [
+        "AWS", "Amazon Web Services",
+        "Amazon Cloud"
+    ],
+    "Hugging Face": [
+        "HuggingFace", "Hugging-Face",
+        "Huggingface"
+    ],
+    "Stability AI": [
+        "StabilityAI", "Stability-AI",
+        "Stable Diffusion"
+    ],
+    "Cohere": [
+        "Cohere Inc"
+    ],
+    "Databricks": [
+        "Databricks Inc"
+    ],
+    "Scale AI": [
+        "ScaleAI", "Scale-AI"
+    ],
+}
 
 
 class EntityNamesResponse(BaseModel):
@@ -80,23 +142,20 @@ class EntityMention:
 
 def _call_llm(prompt: str, schema: type) -> object | None:
     """
-    Send a structured prompt to Gemini.
+    Send a structured prompt to OpenAI.
     Returns parsed response or None on error.
     """
-    client = genai.Client()
+    client = OpenAI()
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=schema,
-            ),
+        response = client.beta.chat.completions.parse(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": prompt}],
+            response_format=schema,
         )
     except Exception as e:
         logging.error(f"LLM request failed: {e}")
         return None
-    return response.parsed
+    return response.choices[0].message.parsed
 
 
 def setup_nlp() -> spacy.language.Language:
@@ -181,24 +240,165 @@ def extract_sentiments_and_counts_per_entity(article: str, entities: list) -> li
             "Empty article or entity list provided to extract_sentiments_and_counts_per_entity.")
         return []
 
-    prompt = f"""Given the following article, determine the sentiment of each mention of the following entities: {entities}.
-        and return a dictionary in the following format.
-        e.g. {{"entity_name": "OpenAI",
-        "entity_type": "company",
-        "mention_count": 5
-        "sentiment": "positive"}}
+    prompt = f"""You are an expert at identifying and analyzing 
+    technology company mentions in news articles. Your task 
+    is to analyze sentiment around specific company mentions 
+    for a public relations intelligence tool.
 
-        Article: {article}. Ensure that you capture the sentiment of each mention of the entity. 
-        If an entity is mentioned in a positive and negative light, two entries should be made. 
-        The same rationale is applied to neutral mentions. However, if for a single entity, there is only positive and neutral, or, negative and neutral:
-        Only the positive/negative sentiments should be counted and the neutral should be ignored. The output should be in the format of a dictionary
-        where the keys are the entities and the values are lists containing the sentiment and count of mentions,
-        e.g. {{"entity_name": "OpenAI",
-        "entity_type": "company",
-        "mention_count": 5
-        "sentiment": "positive"}}.
-        The sentiment should be either 'positive', 'negative' or 'neutral'.
-        If you are unsure, ignore this field as it is likely to be inaccurate."""
+    CRITICAL FILTERING RULES:
+    ==========================================
+    Only analyze actual technology companies. 
+    You MUST REJECT:
+    - Educational institutions (MIT, Stanford, 
+    Berkeley, Harvard, etc.)
+    - Geographic locations (San Francisco, London, 
+    Beijing, Tokyo, etc.)
+    - Government agencies (NSF, DARPA, NIH, etc.)
+    - Generic terms ('the company', 'the firm', etc.)
+    - Non-tech companies (airlines, banks, 
+    restaurants, etc.)
+    - Industry groups or associations
+
+    COMPANY NORMALIZATION:
+    ==========================================
+    Map all entity variations to canonical 
+    industry-standard names using this reference:
+    {TECH_COMPANY_ALIASES}
+
+    Examples:
+    - "Open AI" → "OpenAI"
+    - "MSFT" → "Microsoft"
+    - "Alphabet" → "Google"
+    - "Facebook" → "Meta"
+
+    Use the most common formal name if not 
+    in reference.
+
+    SENTIMENT EXTRACTION RULES:
+    ==========================================
+    Count each sentiment separately. Create 
+    multiple entries if an entity has different 
+    sentiments.
+
+    CRITICAL: Neutral is ONLY for genuinely 
+    balanced or factual statements, NOT a 
+    fallback for unclear statements.
+
+    Neutral examples (keep these):
+    - "Microsoft reported Q3 earnings."
+    - "Tesla announced a new facility in Texas."
+    - "Google operates in 50+ countries."
+    - "Nvidia will attend industry conference."
+
+    NOT neutral (classify as positive/negative):
+    - Uncertain or unclear statements
+    - Mentions without strong tone indicators
+    - Ambiguous phrasing
+
+    SENTIMENT LOGIC:
+    ==========================================
+    1. Normalize entity to canonical name
+    2. Classify each mention as positive, 
+    negative, or neutral
+    3. Group by sentiment
+    4. For each sentiment type with mentions, 
+    create one entry with the count
+
+    Example with multiple sentiments:
+    - Entity mentioned 2x positively → one entry, 
+    mention_count: 2, sentiment: "positive"
+    - Entity mentioned 1x negatively → separate 
+    entry, mention_count: 1, sentiment: "negative"
+    - Entity mentioned 1x neutrally → separate 
+    entry, mention_count: 1, sentiment: "neutral"
+
+    REQUIRED OUTPUT FORMAT:
+    ==========================================
+    Return a JSON array with fields:
+    - entity_name: Canonical company name
+    - entity_type: Always "company"
+    - mention_count: Count of this sentiment
+    - sentiment: "positive", "negative", 
+    or "neutral"
+
+    EXAMPLES OF CORRECT OUTPUT:
+    ==========================================
+    Article: "OpenAI released GPT-5. Critics 
+    raised concerns about safety. The announcement 
+    was made in San Francisco."
+    Output: 
+    [
+    {{"entity_name": "OpenAI", 
+        "entity_type": "company", 
+        "mention_count": 1, 
+        "sentiment": "positive"}},
+    {{"entity_name": "OpenAI", 
+        "entity_type": "company", 
+        "mention_count": 1, 
+        "sentiment": "negative"}}
+    ]
+    (Note: San Francisco rejected, only 2 entries)
+
+    Article: "Microsoft reported strong earnings. 
+    Tesla announced production targets. Both firms 
+    are growing."
+    Output:
+    [
+    {{"entity_name": "Microsoft", 
+        "entity_type": "company", 
+        "mention_count": 2, 
+        "sentiment": "positive"}},
+    {{"entity_name": "Tesla", 
+        "entity_type": "company", 
+        "mention_count": 1, 
+        "sentiment": "positive"}},
+    {{"entity_name": "Tesla", 
+        "entity_type": "company", 
+        "mention_count": 1, 
+        "sentiment": "neutral"}}
+    ]
+    (Neutral for factual statements + 
+    positive implications)
+
+    Article: "Nvidia's stock surged but faces 
+    regulatory scrutiny. The company reported 
+    record revenue."
+    Output:
+    [
+    {{"entity_name": "Nvidia", 
+        "entity_type": "company", 
+        "mention_count": 1, 
+        "sentiment": "positive"}},
+    {{"entity_name": "Nvidia", 
+        "entity_type": "company", 
+        "mention_count": 1, 
+        "sentiment": "negative"}},
+    {{"entity_name": "Nvidia", 
+        "entity_type": "company", 
+        "mention_count": 1, 
+        "sentiment": "neutral"}}
+    ]
+
+    ERRORS TO AVOID:
+    ==========================================
+    ❌ Including universities: 
+    {{"entity_name": "MIT", ...}}
+    ❌ Mapping errors: "Open AI" not "OpenAI"
+    ❌ Using neutral as fallback for uncertainty
+    ❌ Ignoring neutral mentions
+    ❌ Undercounting mentions by combining 
+    different sentiments
+
+    NOW ANALYZE THIS ARTICLE:
+    ==========================================
+    Entities to analyze: {entities}
+
+    Article text:
+    {article}
+
+    Return ONLY valid technology company 
+    mentions with normalized names. If no 
+    valid tech companies, return empty array []."""
 
     llm_response = get_LLM_response(prompt)
 
