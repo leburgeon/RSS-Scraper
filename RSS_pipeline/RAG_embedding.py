@@ -19,6 +19,72 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
+class RAGArticleChunk:
+    """A class representing a chunk of an article, its embedding, and associated metadata."""
+
+    def __init__(self, article_guid: str, chunk_text: str, article_date: datetime):
+
+        self.article_id = article_guid
+        self.text = chunk_text
+        self.embedding = embed_chunk_via_openai(chunk_text)
+        self.entity_names = extract_entities(chunk_text, setup_nlp())
+        self.published_at = article_date
+
+    def upload_to_RDS(self, conn: psycopg2.extensions.connection):
+        """Upload the article chunk and its metadata to the RAG RDS."""
+
+        insert_query = """
+                INSERT INTO chunks (chunk_text, chunk_embedding, entity_names, article_id, published_at)
+                VALUES (%s, %s, %s, %s, %s)
+                """
+
+        if conn is None:
+            logging.error("Failed to connect to RDS. Cannot upload chunk.")
+            return
+
+        self.execute_query(insert_query, conn)
+
+    def execute_query(self, insert_query: str, conn: psycopg2.extensions.connection):
+        """Execute the SQL insert query to upload the chunk data to RDS."""
+
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(insert_query, (
+                    self.text,
+                    self.embedding,
+                    self.entity_names,
+                    self.article_id,
+                    self.published_at
+                ))
+                conn.commit()
+                logging.info(
+                    f"Successfully uploaded chunk for article {self.article_id} to RDS.")
+            except Exception as e:
+                conn.rollback()
+                logging.error(f"Error uploading chunk to RDS: {e}")
+                logging.info("Connection rolled back.")
+
+
+def get_RDS_connection() -> psycopg2.extensions.connection:
+    """Establish a connection to the RAG RDS using psycopg2."""
+
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv("RDS_HOST"),
+            port=os.getenv("RDS_PORT"),
+            dbname=os.getenv("RDS_DB_NAME"),
+            user=os.getenv("RDS_USER"),
+            password=os.getenv("RDS_PASSWORD")
+        )
+        logging.info("Successfully connected to RDS.")
+
+    except psycopg2.Error as e:
+        logging.error(f"Error connecting to RDS: {e}")
+        return None
+
+    return conn
+
+
 def embed_chunk_via_openai(chunk: str) -> list[float]:
     """Embed a chunk of text using OpenAI's embedding API."""
 
@@ -39,19 +105,19 @@ def embed_chunk_via_openai(chunk: str) -> list[float]:
 
     # return response.data[0].embedding
 
+
 def upload_articles_to_RAG_RDS(articles: list[Article]):
     """Upload all article's content and metadata to the RAG RDS."""
 
-    conn = RAGArticleChunk.get_RDS_connection()
+    with get_RDS_connection() as conn:
 
-    for article in articles:
-        upload_article_to_RAG_RDS(article, conn)
+        for article in articles:
+            upload_article_to_RAG_RDS(article, conn)
 
-    conn.close()
 
 def upload_article_to_RAG_RDS(article: Article, conn: psycopg2.extensions.connection):
     """Upload an article's content and metadata to the RAG RDS."""
-    
+
     if article.article_content is None:
         logging.warning(
             f"Article {article.article_guid} has no content. Skipping upload.")
@@ -63,7 +129,7 @@ def upload_article_to_RAG_RDS(article: Article, conn: psycopg2.extensions.connec
         return
 
     for chunk in chunks:
-        
+
         rag_chunk = RAGArticleChunk(
             article_guid=article.article_guid,
             chunk_text=chunk,
@@ -101,74 +167,7 @@ def split_article_to_chunks(article: str, chunk_size: int = 500) -> list[str]:
     return chunks
 
 
-class RAGArticleChunk:
-    """A class representing a chunk of an article, its embedding, and associated metadata."""
-
-    def __init__(self, article_guid: str, chunk_text: str, article_date: datetime):
-
-        self.article_id = article_guid
-        self.text = chunk_text
-        self.embedding = embed_chunk_via_openai(chunk_text)
-        self.entity_names = extract_entities(chunk_text, setup_nlp())
-        self.published_at = article_date
-
-    @staticmethod
-    def get_RDS_connection() -> psycopg2.extensions.connection:
-        """Establish a connection to the RAG RDS using psycopg2."""
-
-        try:
-            conn = psycopg2.connect(
-                host=os.getenv("RDS_HOST"),
-                port=os.getenv("RDS_PORT"),
-                dbname=os.getenv("RDS_DB_NAME"),
-                user=os.getenv("RDS_USER"),
-                password=os.getenv("RDS_PASSWORD")
-            )
-            logging.info("Successfully connected to RDS.")
-
-        except psycopg2.Error as e:
-            logging.error(f"Error connecting to RDS: {e}")
-            return None
-
-        return conn
-
-    def upload_to_RDS(self, conn: psycopg2.extensions.connection):
-        """Upload the article chunk and its metadata to the RAG RDS."""
-
-        insert_query = """
-                INSERT INTO chunks (chunk_text, chunk_embedding, entity_names, article_id, published_at)
-                VALUES (%s, %s, %s, %s, %s)
-                """
-
-        # conn = self.get_RDS_connection()
-        if conn is None:
-            logging.error("Failed to connect to RDS. Cannot upload chunk.")
-            return
-
-        self.execute_query(insert_query, conn)
-
-    def execute_query(self, insert_query: str, conn: psycopg2.extensions.connection):
-        """Execute the SQL insert query to upload the chunk data to RDS."""
-
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(insert_query, (
-                    self.text,
-                    self.embedding,
-                    self.entity_names,
-                    self.article_id,
-                    self.published_at
-                ))
-                conn.commit()
-                logging.info(
-                    f"Successfully uploaded chunk for article {self.article_id} to RDS.")
-            except Exception as e:
-                conn.rollback()
-                logging.error(f"Error uploading chunk to RDS: {e}")
-                logging.info("Connection rolled back.")
-
-
 if __name__ == "__main__":
     # Example usage
-    
+
     pass
