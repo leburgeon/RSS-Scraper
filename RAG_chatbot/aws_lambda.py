@@ -172,6 +172,7 @@ def send_user_input_to_llm(user_input: str) -> str:
 def lambda_handler(event, context):
     """AWS Lambda handler function."""
     user_input = event.get("question", "")
+    logging.info(f"Received user input: {event}")
     if not user_input:
         return {
             "statusCode": 400,

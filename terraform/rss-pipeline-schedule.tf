@@ -163,8 +163,8 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
   family                   = "c22-rss-scraper-task-definition"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "1024"
+  memory                   = "2048"
   execution_role_arn       = aws_iam_role.c22_rss_scraper_role.arn
   task_role_arn            = aws_iam_role.c22_rss_scraper_role.arn
 
@@ -172,6 +172,7 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
     name      = "c22-rss-scraper-container"
     image     = "${aws_ecr_repository.c22_rss_scraper_repository.repository_url}:latest"
     essential = true
+
     secrets = [
       {
         name      = "OPENAI_API_KEY"
