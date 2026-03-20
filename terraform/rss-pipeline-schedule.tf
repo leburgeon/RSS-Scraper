@@ -46,6 +46,18 @@ resource "aws_security_group" "c22_rss_scraper_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+}
+
+# Allow RSS scraper ECS task to connect to RDS
+resource "aws_security_group_rule" "rss_scraper_to_rds_egress" {
+  type                     = "egress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.rds.id
+  security_group_id        = aws_security_group.c22_rss_scraper_sg.id
+  description              = "Allow RSS scraper ECS task to connect to RDS"
 }
 
 # Creates the IAM role assumed by the ECS task definition to pull images, log, and access DynamoDB
