@@ -152,10 +152,10 @@ resource "aws_secretsmanager_secret" "db_credentials" {
   description = "RDS database credentials for the RSS scraper"
 }
 
-# Attaches the RDS password to the Secrets Manager secret
+# In rss-pipeline-schedule.tf
 resource "aws_secretsmanager_secret_version" "db_credentials_version" {
   secret_id     = aws_secretsmanager_secret.db_credentials.id
-  secret_string = aws_secretsmanager_secret_version.rds_master_password.secret_string
+  secret_string = random_password.rds_master_password.result  # Just the password
 }
 
 # Defines the ECS task blueprint, including CPU, memory, Docker image, and log routing
@@ -178,7 +178,7 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
         valueFrom = aws_secretsmanager_secret.llm_api_key.arn
       },
       {
-        name      = "DB_CREDENTIALS"
+      name      = "RDS_PASSWORD"
         valueFrom = aws_secretsmanager_secret.db_credentials.arn
       }
     ]
@@ -193,7 +193,7 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
       },
       {
         name  = "RDS_HOST"
-        value = aws_db_instance.rag_db.endpoint
+        value = aws_db_instance.rag_db.address
       },
       {
         name  = "RDS_PORT"
@@ -204,7 +204,7 @@ resource "aws_ecs_task_definition" "c22_rss_scraper_task_definition" {
         value = "rag_database"
       },
       {
-        name  = "RDS_USERNAME"
+        name  = "RDS_USER"
         value = "media_group_project_RAG_DB"
       }
     ]
