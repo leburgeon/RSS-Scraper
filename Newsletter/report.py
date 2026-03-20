@@ -335,19 +335,23 @@ def generate_report_html(table_name: str, region_name: str) -> str:
 def lambda_handler(event, context):
     """Returns the HTML report in the response body for the Lambda function."""
 
-    table_name = os.environ["table_name"]
-    region_name = os.environ["region_name"]
-    sender_email = os.environ["sender_email"]
-    recipient_email = os.environ["recipient_email"]
+    TABLE_NAME = os.environ["TABLE_NAME"]
+    REGION_NAME = os.environ["REGION_NAME"]
+    SENDER_EMAIL = os.environ["SENDER_EMAIL"]
+    RECIPIENT_EMAIL = os.environ["RECIPIENT_EMAIL"]
 
-    html_report = generate_report_html(table_name, region_name)
+    logging.info("Environment variables loaded")
 
-    ses_client = boto3.client("ses", region_name=region_name)
+    html_report = generate_report_html(TABLE_NAME, REGION_NAME)
+    logging.info("HTML report generated")
+
+    ses_client = boto3.client("ses", region_name=REGION_NAME)
+    logging.info("HTML report generated")
 
     ses_client.send_email(
-        Source=sender_email,
+        Source=SENDER_EMAIL,
         Destination={
-            "ToAddresses": [recipient_email]
+            "ToAddresses": [RECIPIENT_EMAIL]
         },
         Message={
             "Subject": {
@@ -372,10 +376,10 @@ def lambda_handler(event, context):
 def main():
     """Main function to generate and save the HTML report locally."""
 
-    table_name = os.environ["table_name"]
-    region_name = os.environ["region_name"]
+    TABLE_NAME = os.environ["TABLE_NAME"]
+    REGION_NAME = os.environ["REGION_NAME"]
 
-    html_report = generate_report_html(table_name, region_name)
+    html_report = generate_report_html(TABLE_NAME, REGION_NAME)
     save_html_report(html_report, "daily_media_report.html")
 
 
