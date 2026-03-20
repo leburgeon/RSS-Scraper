@@ -7,6 +7,7 @@ which will run the RAG pipeline and return a response. The response will then be
 
 """
 import streamlit as st
+import requests
 
 def get_llm_response(user_input:str) -> str:
     """This functions sends the user_input to a backend lambda function via AWS API Gateway,
@@ -53,11 +54,15 @@ if st.button('Find Answer!'):
             'content': user_input
         })
 
-        bot_response = f'This is a placeholder response to: "{user_input}"'
+        response = requests.post(
+            "https://r7dhlutwgk.execute-api.eu-west-2.amazonaws.com/chat", 
+            params={"question": user_input})
+
+        bot_response = response.json()
 
         st.session_state.chat_history.append({
             'role': 'assistant',
-            'content': bot_response
+            'content': bot_response['response']
         })
 
         # Rerun the app to update the chat display
