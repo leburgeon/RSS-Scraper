@@ -60,17 +60,6 @@ resource "aws_security_group_rule" "rss_scraper_to_rds_egress" {
   description              = "Allow RSS scraper ECS task to connect to RDS"
 }
 
-# Allow DNS resolution (required for RDS hostname lookup)
-resource "aws_security_group_rule" "rss_scraper_dns_egress" {
-  type              = "egress"
-  from_port         = 53
-  to_port           = 53
-  protocol          = "udp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.c22_rss_scraper_sg.id
-  description       = "Allow DNS queries for hostname resolution"
-}
-
 # Creates the IAM role assumed by the ECS task definition to pull images, log, and access DynamoDB
 resource "aws_iam_role" "c22_rss_scraper_role" {
   name = "c22-rss-scraper-role"

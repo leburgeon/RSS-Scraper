@@ -19,6 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = os.getenv("TABLE_NAME")
+REGION_NAME = os.getenv("AWS_REGION")
 
 
 def insert_articles(articles, table):
@@ -105,7 +106,8 @@ def load_entity_mentions(entity_mentions, table):
 def main():
 
     # Get the most recent article date from the database to filter new articles
-    table = boto3.resource('dynamodb').Table(TABLE_NAME)
+    table = boto3.resource(
+        'dynamodb', region_name="eu-west-2").Table(TABLE_NAME)
 
     feed_data = get_all_feed_urls_and_pks(table)
     logging.info(f"Retrieved {len(feed_data)} feed URLs from the database.")
